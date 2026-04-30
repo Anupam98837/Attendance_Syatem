@@ -493,6 +493,32 @@ class PublicDirectoryController extends Controller
             ->map(fn ($row) => $this->doctorCardPayload($row))
             ->values();
 
+        $reviews = DB::table('doctor_reviews as dr')
+            ->join('patients as p', 'p.id', '=', 'dr.patient_id')
+            ->where('dr.doctor_id', $doctor->doctor_id)
+            ->whereNull('dr.deleted_at')
+            ->where('dr.status', 'active')
+            ->orderByDesc('dr.created_at')
+            ->limit(8)
+            ->get([
+                'dr.rating',
+                'dr.title',
+                'dr.review_text',
+                'dr.created_at',
+                'p.first_name',
+                'p.last_name',
+            ])
+            ->map(fn ($row) => [
+                'rating' => (int) ($row->rating ?? 0),
+                'title' => (string) ($row->title ?? ''),
+                'review_text' => (string) ($row->review_text ?? ''),
+                'created_at' => $row->created_at ? \Carbon\Carbon::parse($row->created_at)->format('M d, Y') : '',
+                'patient_name' => collect([
+                    (string) ($row->first_name ?? ''),
+                    (string) ($row->last_name ?? ''),
+                ])->filter()->implode(' '),
+            ])->values();
+
         return view('pages.landing.doctorProfile', [
             'doctor' => [
                 'name' => (string) ($doctor->doctor_name ?? ''),
@@ -542,6 +568,7 @@ class PublicDirectoryController extends Controller
             'services' => $services,
             'qualifications' => $qualifications,
             'clinics' => $clinics,
+            'reviews' => $reviews,
             'similarDoctors' => $similarDoctors,
         ]);
     }

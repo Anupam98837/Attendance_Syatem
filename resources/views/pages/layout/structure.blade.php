@@ -689,6 +689,18 @@
       <a href="/dashboard" class="w3-link"><i class="fa-solid fa-gauge"></i><span>Dashboard</span></a>
     </nav>
 
+    <div id="patientBookingMenu" style="display:none">
+      <div class="w3-nav-section">
+        <div class="w3-section-title"><i class="fa-solid fa-calendar-check"></i> BOOKINGS</div>
+        <div class="w3-section-rule"></div>
+      </div>
+      <nav class="w3-menu" aria-label="Patient Bookings">
+        <a href="/my-bookings" class="w3-link">
+          <i class="fa-solid fa-calendar-days"></i><span>My Bookings</span>
+        </a>
+      </nav>
+    </div>
+
     <div id="studentAcademicMenu" style="display:none">
       <div class="w3-nav-section">
         <div class="w3-section-title"><i class="fa-solid fa-graduation-cap"></i> ACADEMICS</div>
@@ -771,6 +783,9 @@
       <nav class="w3-menu" aria-label="Users">
         <a href="/user/manage" class="w3-link">
           <i class="fa-solid fa-user-group"></i><span>Manage Users</span>
+        </a>
+        <a href="/bookings/manage" class="w3-link">
+          <i class="fa-solid fa-calendar-check"></i><span>Manage Bookings</span>
         </a>
       </nav>
 
@@ -1155,6 +1170,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (role === 'director' || role === 'principal') {
       const block = document.getElementById('siteSettingsContentBlock');
       if (block) block.style.display = 'none';
+    }
+  })();
+
+  (function(){
+    const role = (roleFromStorage || '').toLowerCase();
+    const patientBookingMenu = document.getElementById('patientBookingMenu');
+    if (role === 'patient' && patientBookingMenu) {
+      patientBookingMenu.style.display = '';
     }
   })();
 

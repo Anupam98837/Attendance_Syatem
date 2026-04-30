@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\DepartmentController;
 use App\Http\Controllers\API\DashboardMenuController;
 use App\Http\Controllers\API\ClinicController;
+use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\DoctorProfileController;
 use App\Http\Controllers\API\HospitalController;
 use App\Http\Controllers\API\PagePrivilegeController;
@@ -157,6 +158,17 @@ Route::middleware('checkAuth')->group(function () {
     Route::prefix('doctors')->group(function () {
         Route::get('/profile/{userUuid}', [DoctorProfileController::class, 'show']);
         Route::post('/profile/{userUuid}', [DoctorProfileController::class, 'save']);
+    });
+
+    Route::prefix('bookings')->group(function () {
+        Route::get('/doctors/{doctorSlug}/bootstrap', [BookingController::class, 'bootstrap']);
+        Route::post('/doctors/{doctorSlug}', [BookingController::class, 'store']);
+        Route::get('/dashboard', [BookingController::class, 'dashboard']);
+        Route::get('/mine', [BookingController::class, 'myBookings']);
+        Route::post('/mine/{appointmentId}/cancel', [BookingController::class, 'cancelMyBooking']);
+        Route::post('/mine/{appointmentId}/review', [BookingController::class, 'submitReview']);
+        Route::get('/manage', [BookingController::class, 'adminIndex']);
+        Route::post('/manage/{appointmentId}/status', [BookingController::class, 'adminUpdateStatus']);
     });
 
     Route::prefix('specializations')->group(function () {

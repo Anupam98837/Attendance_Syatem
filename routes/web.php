@@ -12,6 +12,8 @@ Route::get('/doctor/{slug}', [PublicDirectoryController::class, 'doctorShow'])->
 
 Route::view('/dashboard', 'pages.pages.common.dashboard');
 Route::view('/profile', 'pages.pages.user.profile');
+Route::view('/my-bookings', 'pages.pages.bookings.myBookings');
+Route::view('/bookings/manage', 'pages.pages.bookings.manageBookings');
 Route::redirect('/user', '/users/manage');
 
 Route::view('/users/manage', 'pages.pages.users.manageUsers');
