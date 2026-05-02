@@ -4,7 +4,7 @@
 
 @push('styles')
 <style>
-.mbk-wrap{display:grid;gap:16px}
+.mbk-wrap{display:grid;gap:16px;max-width:100%;min-width:0}
 .mbk-head{
   display:flex;
   justify-content:space-between;
@@ -12,6 +12,7 @@
   gap:16px;
   flex-wrap:wrap;
 }
+.mbk-head > div{min-width:0}
 .mbk-head h1{
   margin:0;
   font-size:30px;
@@ -22,33 +23,13 @@
   margin:8px 0 0;
   color:var(--muted-color);
   line-height:1.65;
-  max-width:780px;
-}
-.mbk-toolbar{
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:10px;
-  width:min(100%,860px);
-}
-.mbk-filter{
-  position:relative;
-}
-.mbk-filter i{
-  position:absolute;
-  left:12px;
-  top:50%;
-  transform:translateY(-50%);
-  color:var(--muted-color);
-  pointer-events:none;
-}
-.mbk-filter .form-select,
-.mbk-filter .form-control{
-  padding-left:38px;
+  max-width:820px;
 }
 .mbk-actions-top{
   display:flex;
   gap:10px;
   flex-wrap:wrap;
+  max-width:100%;
 }
 .mbk-card{
   background:var(--surface);
@@ -56,36 +37,28 @@
   border-radius:22px;
   box-shadow:var(--shadow-1);
   padding:18px;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
 }
-.mbk-stats{
-  display:grid;
-  grid-template-columns:repeat(6,minmax(0,1fr));
-  gap:12px;
-}
-.mbk-stat{
-  border:1px solid var(--line-strong);
+.mbk-table-wrap{
+  width:100%;
+  max-width:100%;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
   border-radius:18px;
-  padding:16px;
-  background:var(--surface-2);
+  border:1px solid var(--line-strong);
 }
-.mbk-stat span{
-  display:block;
+.mbk-table-hint{
+  display:none;
+  margin-bottom:10px;
   color:var(--muted-color);
   font-size:12px;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-  font-weight:700;
+  line-height:1.5;
 }
-.mbk-stat strong{
-  display:block;
-  margin-top:10px;
-  font-size:26px;
-  color:var(--ink);
-}
-.mbk-table-wrap{overflow:auto;-webkit-overflow-scrolling:touch}
 .mbk-table{
   width:100%;
-  min-width:1220px;
+  min-width:1040px;
   border-collapse:separate;
   border-spacing:0;
 }
@@ -93,14 +66,22 @@
   padding:14px 12px;
   border-bottom:1px solid var(--line-strong);
   vertical-align:top;
+  white-space:nowrap;
 }
+.mbk-table td .mbk-main,
+.mbk-table td .mbk-sub{white-space:normal}
 .mbk-table th{
   color:var(--muted-color);
   text-transform:uppercase;
   letter-spacing:.08em;
   font-size:12px;
+  background:var(--surface-2);
+  position:sticky;
+  top:0;
+  z-index:1;
 }
 .mbk-table tbody tr:last-child td{border-bottom:0}
+.mbk-table tbody tr.is-selected{background:var(--page-hover)}
 .mbk-main{
   color:var(--ink);
   font-weight:700;
@@ -128,8 +109,62 @@
 .mbk-status.cancelled{background:rgba(107,114,128,.12);color:#374151}
 .mbk-actions{
   display:flex;
-  gap:8px;
-  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+.mbk-action-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  border:0;
+  background:transparent;
+  color:var(--ink);
+  border-radius:12px;
+  padding:10px 12px;
+  text-align:left;
+  font-size:13px;
+}
+.mbk-action-item:hover{
+  background:var(--surface-2);
+}
+.mbk-action-item.text-danger{
+  color:#b91c1c!important;
+}
+.mbk-action-item:disabled{
+  opacity:.55;
+  cursor:not-allowed;
+}
+.mbk-action-toggle{
+  width:36px;
+  height:36px;
+  display:inline-grid;
+  place-items:center;
+  border:1px solid var(--line-strong);
+  border-radius:12px;
+  background:var(--surface);
+  color:var(--ink);
+}
+.mbk-action-toggle:hover,
+.mbk-action-toggle.is-open{
+  background:var(--surface-2);
+}
+#myBookingFloatingMenu{
+  position:fixed;
+  top:0;
+  left:0;
+  min-width:200px;
+  max-width:min(240px, calc(100vw - 20px));
+  padding:8px;
+  background:var(--surface);
+  border:1px solid var(--line-strong);
+  border-radius:16px;
+  box-shadow:0 18px 38px rgba(15,23,42,.12);
+  z-index:1080;
+  display:none;
+}
+#myBookingFloatingMenu .dropdown-divider{
+  margin:6px 0;
+  border-top:1px solid var(--line-strong);
 }
 .mbk-empty{
   border:1px dashed var(--line-strong);
@@ -138,20 +173,41 @@
   text-align:center;
   color:var(--muted-color);
 }
-@media (max-width: 1399.98px){
-  .mbk-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mbk-drawer .offcanvas-body{
+  display:grid;
+  gap:14px;
 }
-@media (max-width: 991.98px){
-  .mbk-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mbk-drawer.offcanvas-end{
+  --bs-offcanvas-width:min(100vw,380px);
+}
+.mbk-filter-field{
+  display:grid;
+  gap:6px;
+}
+.mbk-filter-field label{
+  color:var(--ink);
+  font-size:13px;
+  font-weight:700;
+}
+.mbk-filter-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
 }
 @media (max-width: 767.98px){
-  .mbk-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mbk-actions-top{width:100%}
+  .mbk-actions-top .btn{flex:1 1 calc(50% - 10px)}
+  .mbk-card{padding:16px}
+  .mbk-table{min-width:900px}
+  .mbk-table th,.mbk-table td{padding:12px 10px;font-size:13px}
 }
 @media (max-width: 575.98px){
-  .mbk-toolbar,
-  .mbk-stats{grid-template-columns:1fr}
-  .mbk-actions-top{width:100%}
-  .mbk-actions-top .btn{flex:1 1 0}
+  .mbk-head h1{font-size:26px}
+  .mbk-head p{font-size:14px}
+  .mbk-table-hint{display:block}
+  .mbk-actions-top .btn{flex:1 1 100%}
+  .mbk-filter-actions .btn{flex:1 1 0}
+  .mbk-drawer.offcanvas-end{--bs-offcanvas-width:100vw}
 }
 </style>
 @endpush
@@ -161,9 +217,12 @@
   <div class="mbk-head">
     <div>
       <h1>My Bookings</h1>
-      <p>See every booking made from your account, open the full details, cancel when needed, and leave doctor reviews after admin marks the visit as done.</p>
+      <p>See every booking made from your account, open full details, cancel when needed, and view or submit doctor reviews after admin marks a visit as done.</p>
     </div>
     <div class="mbk-actions-top">
+      <button type="button" class="btn btn-light" data-bs-toggle="offcanvas" data-bs-target="#myBookingsFilterDrawer">
+        <i class="fa fa-sliders me-2"></i>Filters
+      </button>
       <a href="/find-doctors/departments" class="btn btn-primary">
         <i class="fa fa-magnifying-glass me-2"></i>Book Another Doctor
       </a>
@@ -173,37 +232,10 @@
     </div>
   </div>
 
-  <div class="mbk-toolbar">
-    <div class="mbk-filter">
-      <i class="fa fa-filter"></i>
-      <select id="bookingStatusFilter" class="form-select">
-        <option value="all">All status</option>
-        <option value="pending">Pending</option>
-        <option value="approved">Approved</option>
-        <option value="done">Done</option>
-        <option value="rejected">Rejected</option>
-        <option value="cancelled">Cancelled</option>
-      </select>
-    </div>
-    <div class="mbk-filter">
-      <i class="fa fa-user-doctor"></i>
-      <select id="bookingDoctorFilter" class="form-select">
-        <option value="0">All doctors</option>
-      </select>
-    </div>
-    <div class="mbk-filter">
-      <i class="fa fa-calendar-day"></i>
-      <input type="date" id="bookingDateFrom" class="form-control">
-    </div>
-    <div class="mbk-filter">
-      <i class="fa fa-calendar-check"></i>
-      <input type="date" id="bookingDateTo" class="form-control">
-    </div>
-  </div>
-
-  <div class="mbk-stats" id="bookingStats"></div>
-
   <div class="mbk-card">
+    <div class="mbk-table-hint">
+      <i class="fa fa-arrow-left-long me-1"></i>Swipe sideways on mobile to see all columns.
+    </div>
     <div class="mbk-table-wrap">
       <table class="mbk-table">
         <thead>
@@ -221,6 +253,46 @@
     </div>
   </div>
 </div>
+
+<div id="myBookingFloatingMenu" aria-hidden="true"></div>
+
+<div class="offcanvas offcanvas-end mbk-drawer" tabindex="-1" id="myBookingsFilterDrawer" aria-labelledby="myBookingsFilterDrawerLabel">
+  <div class="offcanvas-header">
+    <h5 id="myBookingsFilterDrawerLabel" class="mb-0">Filter My Bookings</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="mbk-filter-field">
+      <label for="bookingFilterStatus">Status</label>
+      <select id="bookingFilterStatus" class="form-select">
+        <option value="all">All status</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="done">Done</option>
+        <option value="rejected">Rejected</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="mbk-filter-field">
+      <label for="bookingFilterDoctor">Doctor</label>
+      <select id="bookingFilterDoctor" class="form-select">
+        <option value="0">All doctors</option>
+      </select>
+    </div>
+    <div class="mbk-filter-field">
+      <label for="bookingFilterDateFrom">Date From</label>
+      <input type="date" id="bookingFilterDateFrom" class="form-control">
+    </div>
+    <div class="mbk-filter-field">
+      <label for="bookingFilterDateTo">Date To</label>
+      <input type="date" id="bookingFilterDateTo" class="form-control">
+    </div>
+    <div class="mbk-filter-actions">
+      <button type="button" class="btn btn-light" id="bookingFilterResetBtn">Reset</button>
+      <button type="button" class="btn btn-primary" id="bookingFilterApplyBtn" data-bs-dismiss="offcanvas">Apply</button>
+    </div>
+  </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -233,17 +305,25 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   const els = {
-    stats: document.getElementById('bookingStats'),
     tableBody: document.getElementById('bookingTableBody'),
-    status: document.getElementById('bookingStatusFilter'),
-    doctor: document.getElementById('bookingDoctorFilter'),
-    dateFrom: document.getElementById('bookingDateFrom'),
-    dateTo: document.getElementById('bookingDateTo'),
-    refresh: document.getElementById('bookingRefreshBtn')
+    floatingMenu: document.getElementById('myBookingFloatingMenu'),
+    refresh: document.getElementById('bookingRefreshBtn'),
+    filterStatus: document.getElementById('bookingFilterStatus'),
+    filterDoctor: document.getElementById('bookingFilterDoctor'),
+    filterDateFrom: document.getElementById('bookingFilterDateFrom'),
+    filterDateTo: document.getElementById('bookingFilterDateTo'),
+    filterReset: document.getElementById('bookingFilterResetBtn'),
+    filterApply: document.getElementById('bookingFilterApplyBtn')
   };
 
-  let filterTimer = null;
   const rowsById = new Map();
+  const state = {
+    status: 'all',
+    doctor_id: '0',
+    date_from: '',
+    date_to: '',
+    doctorOptions: []
+  };
 
   function authHeaders(extra = {}) {
     return Object.assign({
@@ -269,6 +349,15 @@ document.addEventListener('DOMContentLoaded', function () {
       .replace(/'/g, '&#039;');
   }
 
+  function buildParams() {
+    const params = new URLSearchParams();
+    if (state.status && state.status !== 'all') params.set('status', state.status);
+    if (state.doctor_id && state.doctor_id !== '0') params.set('doctor_id', state.doctor_id);
+    if (state.date_from) params.set('date_from', state.date_from);
+    if (state.date_to) params.set('date_to', state.date_to);
+    return params.toString();
+  }
+
   function statusBadge(status) {
     const key = String(status || 'pending').toLowerCase();
     const label = key.charAt(0).toUpperCase() + key.slice(1);
@@ -276,29 +365,11 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function renderDoctorOptions(options) {
-    const current = els.doctor.value || '0';
-    els.doctor.innerHTML = '<option value="0">All doctors</option>' + (Array.isArray(options) ? options.map((item) => `
+    state.doctorOptions = Array.isArray(options) ? options : [];
+    els.filterDoctor.innerHTML = '<option value="0">All doctors</option>' + state.doctorOptions.map((item) => `
       <option value="${esc(item.id)}">${esc(item.name)}</option>
-    `).join('') : '');
-    els.doctor.value = current;
-  }
-
-  function renderStats(counts) {
-    const items = [
-      ['Total', counts.total || 0],
-      ['Pending', counts.pending || 0],
-      ['Approved', counts.approved || 0],
-      ['Done', counts.done || 0],
-      ['Rejected', counts.rejected || 0],
-      ['Cancelled', counts.cancelled || 0]
-    ];
-
-    els.stats.innerHTML = items.map(([label, value]) => `
-      <div class="mbk-stat">
-        <span>${esc(label)}</span>
-        <strong>${esc(value)}</strong>
-      </div>
     `).join('');
+    els.filterDoctor.value = state.doctor_id;
   }
 
   function showClinicDetails(item) {
@@ -316,6 +387,25 @@ document.addEventListener('DOMContentLoaded', function () {
               <tr><th class="ps-0">Visit Note</th><td>${esc(item.clinic_visit_note || 'No clinic note available')}</td></tr>
             </tbody>
           </table>
+        </div>
+      `,
+      confirmButtonText: 'Close'
+    });
+  }
+
+  function showReview(id) {
+    const item = rowsById.get(String(id));
+    if (!item) return;
+
+    Swal.fire({
+      title: item.review_title || 'Doctor Review',
+      width: 680,
+      html: `
+        <div class="text-start">
+          <div class="mb-2"><strong>Doctor:</strong> ${esc(item.doctor_name || 'Doctor')}</div>
+          <div class="mb-2"><strong>Rating:</strong> ${esc(item.review_rating || '—')}/5</div>
+          <div class="mb-2"><strong>Submitted:</strong> ${esc(item.review_created_at || '—')}</div>
+          <div class="border rounded-4 p-3 bg-light-subtle">${esc(item.review_text || 'No review text')}</div>
         </div>
       `,
       confirmButtonText: 'Close'
@@ -363,8 +453,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
       `,
       didOpen: () => {
-        const button = document.getElementById('bookingClinicDetailsBtn');
-        button?.addEventListener('click', function () {
+        document.getElementById('bookingClinicDetailsBtn')?.addEventListener('click', function () {
           showClinicDetails(item);
         });
       },
@@ -474,23 +563,71 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function bindActions() {
-    document.querySelectorAll('.js-booking-details').forEach((button) => {
+    document.querySelectorAll('.js-view-review').forEach((button) => {
       button.addEventListener('click', function () {
-        showDetails(this.dataset.id);
+        showReview(this.dataset.id);
       });
     });
+  }
 
-    document.querySelectorAll('.js-cancel-booking').forEach((button) => {
-      button.addEventListener('click', function () {
-        cancelBooking(this.dataset.id);
-      });
+  function clearSelectedRows() {
+    document.querySelectorAll('.mbk-action-toggle.is-open').forEach((button) => {
+      button.classList.remove('is-open');
+      button.setAttribute('aria-expanded', 'false');
     });
+    document.querySelectorAll('#bookingTableBody tr.is-selected').forEach((row) => row.classList.remove('is-selected'));
+  }
 
-    document.querySelectorAll('.js-submit-review').forEach((button) => {
-      button.addEventListener('click', function () {
-        submitReview(this.dataset.id);
-      });
-    });
+  function hideFloatingMenu() {
+    if (!els.floatingMenu) return;
+    els.floatingMenu.style.display = 'none';
+    els.floatingMenu.style.visibility = 'hidden';
+    els.floatingMenu.innerHTML = '';
+    els.floatingMenu.setAttribute('aria-hidden', 'true');
+    delete els.floatingMenu.dataset.bookingId;
+    clearSelectedRows();
+  }
+
+  function positionFloatingMenu(button) {
+    if (!els.floatingMenu || !button) return;
+    const rect = button.getBoundingClientRect();
+    const gap = 8;
+
+    let left = rect.right - els.floatingMenu.offsetWidth;
+    let top = rect.bottom + gap;
+
+    if (left < 10) left = 10;
+    if (left + els.floatingMenu.offsetWidth > window.innerWidth - 10) {
+      left = Math.max(10, window.innerWidth - els.floatingMenu.offsetWidth - 10);
+    }
+
+    if (top + els.floatingMenu.offsetHeight > window.innerHeight - 10) {
+      const aboveTop = rect.top - els.floatingMenu.offsetHeight - gap;
+      top = aboveTop >= 10 ? aboveTop : Math.max(10, window.innerHeight - els.floatingMenu.offsetHeight - 10);
+    }
+
+    els.floatingMenu.style.top = top + 'px';
+    els.floatingMenu.style.left = left + 'px';
+  }
+
+  function buildFloatingMenuHtml(item) {
+    const actions = [
+      `<button type="button" class="mbk-action-item" data-action="details"><i class="fa fa-eye"></i><span>View Details</span></button>`
+    ];
+
+    if (item.can_review) {
+      actions.push(`<button type="button" class="mbk-action-item" data-action="review"><i class="fa fa-star"></i><span>Give Review</span></button>`);
+    }
+
+    if (item.can_cancel) {
+      actions.push(`<button type="button" class="mbk-action-item text-danger" data-action="cancel"><i class="fa fa-ban"></i><span>Cancel Booking</span></button>`);
+    }
+
+    if (!item.can_review && !item.can_cancel) {
+      actions.push('<button type="button" class="mbk-action-item" disabled><i class="fa fa-lock"></i><span>No More Actions</span></button>');
+    }
+
+    return actions.join('');
   }
 
   function renderRows(items) {
@@ -508,7 +645,7 @@ document.addEventListener('DOMContentLoaded', function () {
     items.forEach((item) => rowsById.set(String(item.id), item));
 
     els.tableBody.innerHTML = items.map((item) => `
-      <tr>
+      <tr data-booking-id="${esc(item.id)}">
         <td>
           <div class="mbk-main">${esc(item.doctor_name || 'Doctor')}</div>
           <span class="mbk-sub">${esc(item.clinic_name || 'Clinic to be confirmed')}</span>
@@ -524,15 +661,13 @@ document.addEventListener('DOMContentLoaded', function () {
         </td>
         <td>${statusBadge(item.status)}</td>
         <td>
-          <div class="mbk-main">${item.review_rating ? esc(item.review_rating + '/5') : 'No review yet'}</div>
-          <span class="mbk-sub">${esc(item.review_title || item.review_text || 'Review becomes available after the booking is marked done.')}</span>
+          ${item.review_id ? `<button type="button" class="btn btn-light btn-sm js-view-review" data-id="${esc(item.id)}"><i class="fa fa-eye me-1"></i>View</button>` : '<span class="mbk-sub">No review yet</span>'}
         </td>
         <td>
           <div class="mbk-actions">
-            <button type="button" class="btn btn-light btn-sm js-booking-details" data-id="${esc(item.id)}"><i class="fa fa-eye me-1"></i>Details</button>
-            ${item.can_cancel ? `<button type="button" class="btn btn-outline-danger btn-sm js-cancel-booking" data-id="${esc(item.id)}"><i class="fa fa-ban me-1"></i>Cancel</button>` : ''}
-            ${item.can_review ? `<button type="button" class="btn btn-success btn-sm js-submit-review" data-id="${esc(item.id)}"><i class="fa fa-star me-1"></i>Review</button>` : ''}
-            <a href="/doctor/${encodeURIComponent(item.doctor_slug || '')}" class="btn btn-light btn-sm"><i class="fa fa-arrow-up-right-from-square me-1"></i>Doctor</a>
+            <button type="button" class="mbk-action-toggle js-booking-action-toggle" data-id="${esc(item.id)}" aria-expanded="false" aria-label="Booking actions">
+              <i class="fa fa-ellipsis-vertical"></i>
+            </button>
           </div>
         </td>
       </tr>
@@ -541,16 +676,24 @@ document.addEventListener('DOMContentLoaded', function () {
     bindActions();
   }
 
+  function syncDrawerFields() {
+    els.filterStatus.value = state.status;
+    els.filterDoctor.value = state.doctor_id;
+    els.filterDateFrom.value = state.date_from;
+    els.filterDateTo.value = state.date_to;
+  }
+
+  function applyDrawerFields() {
+    state.status = els.filterStatus.value || 'all';
+    state.doctor_id = els.filterDoctor.value || '0';
+    state.date_from = els.filterDateFrom.value || '';
+    state.date_to = els.filterDateTo.value || '';
+  }
+
   async function loadBookings() {
     try {
-      const params = new URLSearchParams({
-        status: els.status.value || 'all',
-        doctor_id: els.doctor.value || '0',
-        date_from: els.dateFrom.value || '',
-        date_to: els.dateTo.value || ''
-      });
-
-      const res = await fetch('/api/bookings/mine?' + params.toString(), {
+      const qs = buildParams();
+      const res = await fetch('/api/bookings/mine' + (qs ? '?' + qs : ''), {
         headers: authHeaders()
       });
       const data = await res.json().catch(() => ({}));
@@ -565,8 +708,8 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       renderDoctorOptions(data.doctor_options || []);
-      renderStats(data.counts || {});
       renderRows(data.bookings || []);
+      syncDrawerFields();
     } catch (error) {
       els.tableBody.innerHTML = `
         <tr>
@@ -576,8 +719,84 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  [els.status, els.doctor, els.dateFrom, els.dateTo].forEach((input) => {
-    input.addEventListener('change', loadBookings);
+  els.filterApply.addEventListener('click', function () {
+    applyDrawerFields();
+    loadBookings();
+  });
+
+  els.filterReset.addEventListener('click', function () {
+    state.status = 'all';
+    state.doctor_id = '0';
+    state.date_from = '';
+    state.date_to = '';
+    syncDrawerFields();
+    loadBookings();
+  });
+
+  els.tableBody.addEventListener('click', function (e) {
+    const reviewBtn = e.target.closest('.js-view-review');
+    if (reviewBtn) {
+      e.preventDefault();
+      showReview(reviewBtn.dataset.id);
+      return;
+    }
+
+    const toggle = e.target.closest('.js-booking-action-toggle');
+    if (!toggle) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const row = toggle.closest('tr');
+    const bookingId = String(toggle.dataset.id || row?.dataset.bookingId || '');
+    const item = rowsById.get(bookingId);
+    if (!row || !item || !els.floatingMenu) return;
+
+    if (els.floatingMenu.style.display === 'block' && els.floatingMenu.dataset.bookingId === bookingId) {
+      hideFloatingMenu();
+      return;
+    }
+
+    clearSelectedRows();
+    row.classList.add('is-selected');
+    toggle.classList.add('is-open');
+    toggle.setAttribute('aria-expanded', 'true');
+
+    els.floatingMenu.innerHTML = buildFloatingMenuHtml(item);
+    els.floatingMenu.dataset.bookingId = bookingId;
+    els.floatingMenu.style.display = 'block';
+    els.floatingMenu.style.visibility = 'hidden';
+
+    requestAnimationFrame(() => {
+      positionFloatingMenu(toggle);
+      els.floatingMenu.style.visibility = 'visible';
+      els.floatingMenu.setAttribute('aria-hidden', 'false');
+    });
+  });
+
+  document.addEventListener('click', function (e) {
+    const actionBtn = e.target.closest('#myBookingFloatingMenu [data-action]');
+    if (actionBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const bookingId = els.floatingMenu?.dataset.bookingId || '';
+      hideFloatingMenu();
+      if (!bookingId) return;
+      if (actionBtn.dataset.action === 'details') return showDetails(bookingId);
+      if (actionBtn.dataset.action === 'review') return submitReview(bookingId);
+      if (actionBtn.dataset.action === 'cancel') return cancelBooking(bookingId);
+      return;
+    }
+
+    if (!e.target.closest('#myBookingFloatingMenu, .js-booking-action-toggle')) {
+      hideFloatingMenu();
+    }
+  });
+
+  window.addEventListener('scroll', hideFloatingMenu, true);
+  window.addEventListener('resize', hideFloatingMenu);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') hideFloatingMenu();
   });
 
   els.refresh.addEventListener('click', loadBookings);

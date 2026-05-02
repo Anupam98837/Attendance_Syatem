@@ -98,7 +98,7 @@ class BookingController extends Controller
             'patient_phone_number' => 'required|string|max:32',
             'patient_alternative_phone_number' => 'nullable|string|max:32',
             'patient_email' => 'nullable|email|max:255',
-            'patient_address' => 'nullable|string',
+            'patient_address' => 'required|string',
             'symptoms' => 'nullable|string|max:2000',
         ]);
 
@@ -250,15 +250,23 @@ class BookingController extends Controller
             return $auth['error'];
         }
 
+        $status = trim((string) $request->query('status', ''));
+        $doctorId = (int) ($request->query('doctor_id') ?? 0);
+        $dateFrom = $this->nullableString($request->query('date_from'));
+        $dateTo = $this->nullableString($request->query('date_to'));
+
         if ($this->isAdminRole($auth['role'])) {
-            $recent = $this->appointmentBaseQuery()
-                ->limit(6)
-                ->get();
+            $recentQuery = $this->appointmentBaseQuery();
+            $this->applyAppointmentFilters($recentQuery, $status, $doctorId, $dateFrom, $dateTo);
+
+            $recent = $recentQuery->limit(6)->get();
 
             return response()->json([
                 'status' => 'success',
                 'role' => 'admin',
                 'counts' => $this->appointmentStatusCounts(),
+                'admin_overview' => $this->adminDashboardOverview(),
+                'doctor_options' => $this->doctorFilterOptions(),
                 'links' => [
                     'manage_bookings' => '/bookings/manage',
                     'profile' => '/profile',
@@ -267,15 +275,17 @@ class BookingController extends Controller
             ]);
         }
 
-        $recent = $this->appointmentBaseQuery()
-            ->where('a.booked_by_user_id', $auth['user_id'])
-            ->limit(6)
-            ->get();
+        $recentQuery = $this->appointmentBaseQuery()
+            ->where('a.booked_by_user_id', $auth['user_id']);
+        $this->applyAppointmentFilters($recentQuery, $status, $doctorId, $dateFrom, $dateTo);
+
+        $recent = $recentQuery->limit(6)->get();
 
         return response()->json([
             'status' => 'success',
             'role' => 'patient',
             'counts' => $this->appointmentStatusCounts($auth['user_id']),
+            'doctor_options' => $this->doctorFilterOptions($auth['user_id']),
             'links' => [
                 'my_bookings' => '/my-bookings',
                 'profile' => '/profile',
@@ -299,22 +309,7 @@ class BookingController extends Controller
 
         $query = $this->appointmentBaseQuery()
             ->where('a.booked_by_user_id', $auth['user_id']);
-
-        if ($status !== '' && $status !== 'all') {
-            $query->where('a.status', $status);
-        }
-
-        if ($doctorId > 0) {
-            $query->where('a.doctor_id', $doctorId);
-        }
-
-        if ($dateFrom) {
-            $query->whereDate('a.appointment_date', '>=', $dateFrom);
-        }
-
-        if ($dateTo) {
-            $query->whereDate('a.appointment_date', '<=', $dateTo);
-        }
+        $this->applyAppointmentFilters($query, $status, $doctorId, $dateFrom, $dateTo);
 
         $rows = $query->get();
 
@@ -481,21 +476,7 @@ class BookingController extends Controller
 
         $query = $this->appointmentBaseQuery();
 
-        if ($status !== '' && $status !== 'all') {
-            $query->where('a.status', $status);
-        }
-
-        if ($doctorId > 0) {
-            $query->where('a.doctor_id', $doctorId);
-        }
-
-        if ($dateFrom) {
-            $query->whereDate('a.appointment_date', '>=', $dateFrom);
-        }
-
-        if ($dateTo) {
-            $query->whereDate('a.appointment_date', '<=', $dateTo);
-        }
+        $this->applyAppointmentFilters($query, $status, $doctorId, $dateFrom, $dateTo);
 
         if ($search !== '') {
             $query->where(function ($builder) use ($search) {
@@ -862,6 +843,176 @@ class BookingController extends Controller
         ];
     }
 
+    private function adminDashboardOverview(): array
+    {
+        $counts = $this->appointmentStatusCounts();
+        $today = now()->toDateString();
+        $last7Days = collect(range(6, 0))->map(function (int $daysAgo) {
+            $date = now()->subDays($daysAgo);
+
+            return [
+                'key' => $date->toDateString(),
+                'label' => $date->format('M d'),
+            ];
+        })->values();
+
+        $trendRows = DB::table('appointments as a')
+            ->whereNull('a.deleted_at')
+            ->whereDate('a.created_at', '>=', now()->subDays(6)->toDateString())
+            ->selectRaw('DATE(a.created_at) as booking_day')
+            ->selectRaw('COUNT(*) as total_count')
+            ->selectRaw("SUM(CASE WHEN a.status = 'done' THEN 1 ELSE 0 END) as done_count")
+            ->selectRaw("SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) as pending_count")
+            ->groupBy(DB::raw('DATE(a.created_at)'))
+            ->get()
+            ->keyBy('booking_day');
+
+        $trend = $last7Days->map(function (array $day) use ($trendRows) {
+            $row = $trendRows->get($day['key']);
+
+            return [
+                'date' => $day['key'],
+                'label' => $day['label'],
+                'total' => (int) ($row->total_count ?? 0),
+                'done' => (int) ($row->done_count ?? 0),
+                'pending' => (int) ($row->pending_count ?? 0),
+            ];
+        })->values()->all();
+
+        $bookingMix = DB::table('appointments as a')
+            ->whereNull('a.deleted_at')
+            ->select('a.booking_for', DB::raw('COUNT(*) as total'))
+            ->groupBy('a.booking_for')
+            ->pluck('total', 'booking_for');
+
+        $topDoctors = DB::table('appointments as a')
+            ->join('doctors as d', 'd.id', '=', 'a.doctor_id')
+            ->join('users as u', 'u.id', '=', 'd.user_id')
+            ->whereNull('a.deleted_at')
+            ->whereNull('d.deleted_at')
+            ->whereNull('u.deleted_at')
+            ->select([
+                'd.id as doctor_id',
+                'u.name as doctor_name',
+                'd.total_patients_treated',
+                'd.average_rating',
+                'd.review_count',
+            ])
+            ->selectRaw('COUNT(a.id) as total_bookings')
+            ->selectRaw("SUM(CASE WHEN a.status = 'done' THEN 1 ELSE 0 END) as done_bookings")
+            ->selectRaw("SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) as pending_bookings")
+            ->groupBy('d.id', 'u.name', 'd.total_patients_treated', 'd.average_rating', 'd.review_count')
+            ->orderByDesc('total_bookings')
+            ->orderByDesc('done_bookings')
+            ->limit(5)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'doctor_id' => (int) ($row->doctor_id ?? 0),
+                    'name' => (string) ($row->doctor_name ?? ''),
+                    'total_bookings' => (int) ($row->total_bookings ?? 0),
+                    'done_bookings' => (int) ($row->done_bookings ?? 0),
+                    'pending_bookings' => (int) ($row->pending_bookings ?? 0),
+                    'total_patients_treated' => (int) ($row->total_patients_treated ?? 0),
+                    'average_rating' => round((float) ($row->average_rating ?? 0), 1),
+                    'review_count' => (int) ($row->review_count ?? 0),
+                ];
+            })->values()->all();
+
+        $totalReviews = DB::table('doctor_reviews')
+            ->whereNull('deleted_at')
+            ->count();
+
+        $averageReview = DB::table('doctor_reviews')
+            ->whereNull('deleted_at')
+            ->avg('rating');
+
+        $cards = [
+            [
+                'key' => 'total_bookings',
+                'label' => 'Total Bookings',
+                'value' => (int) $counts['total'],
+                'meta' => 'All appointment requests in the system',
+                'icon' => 'fa-calendar-check',
+                'tone' => 'primary',
+            ],
+            [
+                'key' => 'pending_bookings',
+                'label' => 'Pending Action',
+                'value' => (int) $counts['pending'],
+                'meta' => 'Bookings waiting for admin review',
+                'icon' => 'fa-hourglass-half',
+                'tone' => 'warning',
+            ],
+            [
+                'key' => 'done_bookings',
+                'label' => 'Completed Visits',
+                'value' => (int) $counts['done'],
+                'meta' => 'Appointments already marked done',
+                'icon' => 'fa-circle-check',
+                'tone' => 'success',
+            ],
+            [
+                'key' => 'active_doctors',
+                'label' => 'Active Doctors',
+                'value' => DB::table('doctors')
+                    ->whereNull('deleted_at')
+                    ->where('status', 'active')
+                    ->count(),
+                'meta' => 'Doctor profiles available in the platform',
+                'icon' => 'fa-user-doctor',
+                'tone' => 'info',
+            ],
+            [
+                'key' => 'active_patients',
+                'label' => 'Patient Records',
+                'value' => DB::table('patients')
+                    ->whereNull('deleted_at')
+                    ->where('status', 'active')
+                    ->count(),
+                'meta' => 'Stored patient profiles and family records',
+                'icon' => 'fa-user-group',
+                'tone' => 'violet',
+            ],
+            [
+                'key' => 'active_clinics',
+                'label' => 'Active Clinics',
+                'value' => DB::table('clinics')
+                    ->whereNull('deleted_at')
+                    ->where('status', 'active')
+                    ->count(),
+                'meta' => 'Clinics available for booking',
+                'icon' => 'fa-hospital',
+                'tone' => 'neutral',
+            ],
+        ];
+
+        return [
+            'cards' => $cards,
+            'trend' => $trend,
+            'status_distribution' => $counts,
+            'booking_mix' => [
+                'self' => (int) ($bookingMix['self'] ?? 0),
+                'family' => (int) ($bookingMix['family'] ?? 0),
+            ],
+            'today' => [
+                'new_bookings' => DB::table('appointments')
+                    ->whereNull('deleted_at')
+                    ->whereDate('created_at', $today)
+                    ->count(),
+                'appointments' => DB::table('appointments')
+                    ->whereNull('deleted_at')
+                    ->whereDate('appointment_date', $today)
+                    ->count(),
+            ],
+            'reviews' => [
+                'total' => (int) $totalReviews,
+                'average_rating' => round((float) ($averageReview ?? 0), 1),
+            ],
+            'top_doctors' => $topDoctors,
+        ];
+    }
+
     private function doctorFilterOptions(?int $bookedByUserId = null): array
     {
         $query = DB::table('appointments as a')
@@ -883,6 +1034,25 @@ class BookingController extends Controller
                 'id' => (int) ($row->doctor_id ?? 0),
                 'name' => (string) ($row->doctor_name ?? ''),
             ])->values()->all();
+    }
+
+    private function applyAppointmentFilters($query, string $status, int $doctorId, ?string $dateFrom, ?string $dateTo): void
+    {
+        if ($status !== '' && $status !== 'all') {
+            $query->where('a.status', $status);
+        }
+
+        if ($doctorId > 0) {
+            $query->where('a.doctor_id', $doctorId);
+        }
+
+        if ($dateFrom) {
+            $query->whereDate('a.appointment_date', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->whereDate('a.appointment_date', '<=', $dateTo);
+        }
     }
 
     private function syncDoctorReviewAggregate(int $doctorId): void

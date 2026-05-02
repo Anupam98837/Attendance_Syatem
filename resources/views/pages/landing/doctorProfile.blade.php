@@ -480,7 +480,7 @@
 
             <div class="landing-booking-field is-span-2">
               <label for="doctorBookingAddress">Address</label>
-              <textarea name="patient_address" id="doctorBookingAddress"></textarea>
+              <textarea name="patient_address" id="doctorBookingAddress" required></textarea>
               <div class="landing-booking-error" data-error-for="patient_address"></div>
             </div>
 
@@ -516,10 +516,16 @@
             <h3>Appointment request created</h3>
             <p id="doctorBookingSuccessText">Your booking details have been saved. Our team can now continue from the appointment record.</p>
           </div>
-          <button type="button" class="landing-btn landing-btn-light js-close-book-modal">
-            <i class="fa-solid fa-arrow-left"></i>
-            <span>Back to doctor profile</span>
-          </button>
+          <div class="landing-booking-actions">
+            <a href="/my-bookings" class="landing-btn landing-btn-primary">
+              <i class="fa-solid fa-calendar-days"></i>
+              <span>View Booking</span>
+            </a>
+            <button type="button" class="landing-btn landing-btn-light js-close-book-modal">
+              <i class="fa-solid fa-arrow-left"></i>
+              <span>Back to doctor profile</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

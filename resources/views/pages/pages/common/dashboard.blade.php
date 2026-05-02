@@ -4,7 +4,7 @@
 
 @push('styles')
 <style>
-.bdash-wrap{display:grid;gap:18px}
+.bdash-wrap{display:grid;gap:16px;max-width:100%;min-width:0}
 .bdash-head{
   display:flex;
   justify-content:space-between;
@@ -12,6 +12,7 @@
   gap:16px;
   flex-wrap:wrap;
 }
+.bdash-head > div{min-width:0}
 .bdash-head-copy h1{
   margin:0;
   font-size:clamp(25px,3vw,36px);
@@ -28,44 +29,93 @@
   display:flex;
   gap:10px;
   flex-wrap:wrap;
+  max-width:100%;
 }
-.bdash-grid{
+#dashboardActions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  max-width:100%;
+}
+.bdash-admin-shell{
   display:grid;
-  grid-template-columns:repeat(6,minmax(0,1fr));
-  gap:14px;
-}
-.bdash-stat{
-  background:var(--surface);
-  border:1px solid var(--line-strong);
-  border-radius:20px;
-  padding:18px;
-  box-shadow:var(--shadow-1);
-}
-.bdash-stat-label{
-  color:var(--muted-color);
-  font-size:12px;
-  font-weight:700;
-  text-transform:uppercase;
-  letter-spacing:.08em;
-}
-.bdash-stat-value{
-  margin-top:12px;
-  font-size:30px;
-  font-weight:800;
-  color:var(--ink);
-  line-height:1;
-}
-.bdash-panels{
-  display:grid;
-  grid-template-columns:minmax(0,1.4fr) minmax(340px,.9fr);
   gap:16px;
 }
+.bdash-metric-grid{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:12px;
+}
+.bdash-metric-card{
+  position:relative;
+  overflow:hidden;
+  background:var(--surface);
+  border:1px solid var(--line-strong);
+  border-radius:22px;
+  box-shadow:var(--shadow-1);
+  padding:18px;
+}
+.bdash-metric-card::after{
+  content:"";
+  position:absolute;
+  inset:auto 0 0 0;
+  height:4px;
+  background:var(--metric-accent, #2563eb);
+  opacity:.9;
+}
+.bdash-metric-card-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:12px;
+}
+.bdash-metric-card span{
+  display:block;
+  color:var(--muted-color);
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  font-weight:700;
+}
+.bdash-metric-card strong{
+  display:block;
+  margin-top:10px;
+  color:var(--ink);
+  font-size:30px;
+  line-height:1;
+}
+.bdash-metric-card p{
+  margin:10px 0 0;
+  color:var(--muted-color);
+  font-size:13px;
+  line-height:1.6;
+}
+.bdash-metric-icon{
+  width:44px;
+  height:44px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  background:rgba(15,23,42,.06);
+  color:var(--metric-accent, #2563eb);
+  font-size:16px;
+  flex:0 0 auto;
+}
+.bdash-tone-primary{--metric-accent:#2563eb}
+.bdash-tone-warning{--metric-accent:#d97706}
+.bdash-tone-success{--metric-accent:#059669}
+.bdash-tone-info{--metric-accent:#0891b2}
+.bdash-tone-violet{--metric-accent:#7c3aed}
+.bdash-tone-neutral{--metric-accent:#475569}
 .bdash-card{
   background:var(--surface);
   border:1px solid var(--line-strong);
   border-radius:22px;
   padding:18px;
   box-shadow:var(--shadow-1);
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
 }
 .bdash-card-head{
   display:flex;
@@ -73,6 +123,7 @@
   align-items:flex-start;
   gap:12px;
   margin-bottom:14px;
+  flex-wrap:wrap;
 }
 .bdash-card-head h2{
   margin:0;
@@ -86,8 +137,21 @@
   line-height:1.6;
   font-size:13px;
 }
-.bdash-table-wrap{overflow:auto}
-.bdash-table-wrap{-webkit-overflow-scrolling:touch}
+.bdash-table-wrap{
+  width:100%;
+  max-width:100%;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+  border-radius:18px;
+  border:1px solid var(--line-strong);
+}
+.bdash-table-hint{
+  display:none;
+  margin-bottom:10px;
+  color:var(--muted-color);
+  font-size:12px;
+  line-height:1.5;
+}
 .bdash-table{
   width:100%;
   min-width:860px;
@@ -99,12 +163,19 @@
   padding:13px 12px;
   border-bottom:1px solid var(--line-strong);
   vertical-align:top;
+  white-space:nowrap;
 }
+.bdash-table td .bdash-sub,
+.bdash-table td .bdash-main{white-space:normal}
 .bdash-table th{
   color:var(--muted-color);
   font-size:12px;
   text-transform:uppercase;
   letter-spacing:.07em;
+  background:var(--surface-2);
+  position:sticky;
+  top:0;
+  z-index:1;
 }
 .bdash-table tbody tr:last-child td{border-bottom:0}
 .bdash-main{
@@ -128,31 +199,148 @@
   padding:14px;
   background:var(--surface-2);
 }
-.bdash-list-item strong{
-  display:block;
-  color:var(--ink);
-}
 .bdash-list-item span{
   display:block;
-  margin-top:6px;
   color:var(--muted-color);
-  line-height:1.55;
+  line-height:1.6;
   font-size:13px;
 }
-.bdash-empty{
-  border:1px dashed var(--line-strong);
-  border-radius:18px;
-  padding:28px 18px;
-  text-align:center;
-  color:var(--muted-color);
+.bdash-top-line{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  color:var(--ink);
+  font-weight:700;
 }
-.bdash-loader{
-  min-height:220px;
-  display:grid;
-  place-items:center;
+.bdash-top-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 12px;
+  margin-top:8px;
   color:var(--muted-color);
+  font-size:12px;
+  line-height:1.5;
+}
+.bdash-snapshot{
+  display:grid;
+  gap:16px;
+}
+.bdash-snapshot-block{
+  display:grid;
+  gap:10px;
+}
+.bdash-snapshot-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border:1px solid var(--line-strong);
+  border-radius:16px;
+  background:var(--surface-2);
+}
+.bdash-snapshot-row span{
+  color:var(--muted-color);
+  font-size:13px;
+}
+.bdash-snapshot-row strong{
+  color:var(--ink);
+  font-size:18px;
+}
+.bdash-progress-group{
+  display:grid;
+  gap:10px;
+}
+.bdash-progress-row{
+  display:grid;
+  gap:6px;
+}
+.bdash-progress-copy{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  color:var(--muted-color);
+  font-size:12px;
+}
+.bdash-progress-track{
+  width:100%;
+  height:9px;
+  border-radius:999px;
+  background:rgba(148,163,184,.18);
+  overflow:hidden;
+}
+.bdash-progress-fill{
+  display:block;
+  height:100%;
+  border-radius:999px;
+  background:var(--progress-accent, #2563eb);
+}
+.bdash-progress-fill.is-success{--progress-accent:#059669}
+.bdash-progress-fill.is-warning{--progress-accent:#d97706}
+.bdash-progress-fill.is-danger{--progress-accent:#dc2626}
+.bdash-progress-fill.is-neutral{--progress-accent:#64748b}
+.bdash-progress-fill.is-violet{--progress-accent:#7c3aed}
+.bdash-trend-wrap{
+  display:grid;
+  gap:14px;
+}
+.bdash-trend-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:14px;
+  color:var(--muted-color);
+  font-size:12px;
+}
+.bdash-legend-dot{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.bdash-legend-dot::before{
+  content:"";
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  background:var(--legend-color, #2563eb);
+}
+.bdash-legend-dot.total::before{--legend-color:#2563eb}
+.bdash-legend-dot.done::before{--legend-color:#059669}
+.bdash-trend-bars{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:10px;
+  align-items:end;
+  min-height:220px;
+}
+.bdash-trend-col{min-width:0}
+.bdash-trend-track{
+  height:180px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  gap:6px;
+}
+.bdash-trend-bar{
+  width:18px;
+  min-height:6px;
+  border-radius:999px 999px 0 0;
+}
+.bdash-trend-bar.total{background:rgba(37,99,235,.28)}
+.bdash-trend-bar.done{background:#059669}
+.bdash-trend-label{
+  margin-top:10px;
   text-align:center;
-  line-height:1.6;
+  color:var(--muted-color);
+  font-size:12px;
+}
+.bdash-trend-value{
+  text-align:center;
+  color:var(--ink);
+  font-size:12px;
+  font-weight:700;
+  margin-top:4px;
 }
 .bdash-pill{
   display:inline-flex;
@@ -173,20 +361,65 @@
   display:flex;
   gap:8px;
   flex-wrap:wrap;
+  min-width:170px;
 }
-@media (max-width: 1399.98px){
-  .bdash-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.bdash-empty{
+  border:1px dashed var(--line-strong);
+  border-radius:18px;
+  padding:28px 18px;
+  text-align:center;
+  color:var(--muted-color);
+}
+.bdash-loader{
+  min-height:220px;
+  display:grid;
+  place-items:center;
+  color:var(--muted-color);
+  text-align:center;
+}
+.bdash-drawer .offcanvas-body{
+  display:grid;
+  gap:14px;
+}
+.bdash-drawer.offcanvas-end{
+  --bs-offcanvas-width:min(100vw,380px);
+}
+.bdash-filter-field{
+  display:grid;
+  gap:6px;
+}
+.bdash-filter-field label{
+  color:var(--ink);
+  font-size:13px;
+  font-weight:700;
+}
+.bdash-filter-actions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
 }
 @media (max-width: 1199.98px){
-  .bdash-panels{grid-template-columns:1fr}
+  .bdash-metric-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width: 767.98px){
-  .bdash-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .bdash-actions{width:100%}
-  .bdash-actions .btn{flex:1 1 0}
+  .bdash-actions .btn{flex:1 1 calc(50% - 10px)}
+  #dashboardActions{width:100%}
+  #dashboardActions .btn{flex:1 1 calc(50% - 10px)}
+  .bdash-card{padding:16px}
+  .bdash-table th,.bdash-table td{padding:12px 10px;font-size:13px}
+  .bdash-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width: 575.98px){
-  .bdash-grid{grid-template-columns:1fr}
+  .bdash-head-copy p{font-size:14px}
+  .bdash-table-hint{display:block}
+  .bdash-actions .btn,
+  #dashboardActions .btn{flex:1 1 100%}
+  .bdash-filter-actions .btn{flex:1 1 0}
+  .bdash-drawer.offcanvas-end{--bs-offcanvas-width:100vw}
+  .bdash-metric-grid{grid-template-columns:1fr}
+  .bdash-trend-bars{gap:6px}
+  .bdash-trend-bar{width:12px}
 }
 </style>
 @endpush
@@ -198,7 +431,12 @@
       <h1 id="dashboardTitle">Dashboard</h1>
       <p id="dashboardSubtitle">Loading your booking summary...</p>
     </div>
-    <div class="bdash-actions" id="dashboardActions"></div>
+    <div class="bdash-actions">
+      <button type="button" class="btn btn-light" data-bs-toggle="offcanvas" data-bs-target="#dashboardFilterDrawer">
+        <i class="fa fa-sliders me-2"></i>Filters
+      </button>
+      <div id="dashboardActions"></div>
+    </div>
   </div>
 
   <div id="dashboardLoader" class="bdash-loader">
@@ -209,41 +447,118 @@
   </div>
 
   <div id="dashboardContent" style="display:none;">
-    <div class="bdash-grid" id="dashboardStats"></div>
+    <div id="dashboardAdminOverview" class="bdash-admin-shell" style="display:none;">
+      <div class="bdash-metric-grid" id="dashboardAdminCards"></div>
 
-    <div class="bdash-panels">
-      <div class="bdash-card">
-        <div class="bdash-card-head">
-          <div>
-            <h2 id="dashboardRecentTitle">Recent bookings</h2>
-            <p id="dashboardRecentSubtitle">Latest booking activity from your account.</p>
+      <div class="row g-3">
+        <div class="col-12 col-xxl-8">
+          <div class="bdash-card">
+            <div class="bdash-card-head">
+              <div>
+                <h2>System Activity</h2>
+                <p>Booking volume across the last 7 days with completed visits highlighted.</p>
+              </div>
+            </div>
+            <div class="bdash-trend-wrap">
+              <div class="bdash-trend-legend">
+                <span class="bdash-legend-dot total">Total bookings</span>
+                <span class="bdash-legend-dot done">Done bookings</span>
+              </div>
+              <div id="dashboardAdminTrend"></div>
+            </div>
           </div>
         </div>
-        <div class="bdash-table-wrap">
-          <table class="bdash-table">
-            <thead>
-              <tr>
-                <th>Doctor</th>
-                <th>Patient</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="dashboardRecentBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="bdash-card">
-        <div class="bdash-card-head">
-          <div>
-            <h2>Quick view</h2>
-            <p>Key things worth checking from the booking flow.</p>
+        <div class="col-12 col-xxl-4">
+          <div class="bdash-card">
+            <div class="bdash-card-head">
+              <div>
+                <h2>System Snapshot</h2>
+                <p>Today’s movement, booking mix, and overall status balance.</p>
+              </div>
+            </div>
+            <div class="bdash-snapshot" id="dashboardAdminSnapshot"></div>
           </div>
         </div>
-        <div class="bdash-list" id="dashboardHighlights"></div>
       </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-xl-8">
+        <div class="bdash-card">
+          <div class="bdash-card-head">
+            <div>
+              <h2 id="dashboardRecentTitle">Recent bookings</h2>
+              <p id="dashboardRecentSubtitle">Latest booking activity from your account.</p>
+            </div>
+          </div>
+          <div class="bdash-table-hint">
+            <i class="fa fa-arrow-left-long me-1"></i>Swipe sideways on mobile to see all columns.
+          </div>
+          <div class="bdash-table-wrap">
+            <table class="bdash-table">
+              <thead>
+                <tr>
+                  <th>Doctor</th>
+                  <th>Patient</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardRecentBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-xl-4">
+        <div class="bdash-card">
+          <div class="bdash-card-head">
+            <div>
+              <h2 id="dashboardHighlightsTitle">Quick View</h2>
+              <p id="dashboardHighlightsSubtitle">Important booking context at a glance.</p>
+            </div>
+          </div>
+          <div class="bdash-list" id="dashboardHighlights"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="offcanvas offcanvas-end bdash-drawer" tabindex="-1" id="dashboardFilterDrawer" aria-labelledby="dashboardFilterDrawerLabel">
+  <div class="offcanvas-header">
+    <h5 id="dashboardFilterDrawerLabel" class="mb-0">Filter Recent Bookings</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div class="bdash-filter-field">
+      <label for="dashboardFilterStatus">Status</label>
+      <select id="dashboardFilterStatus" class="form-select">
+        <option value="all">All status</option>
+        <option value="pending">Pending</option>
+        <option value="approved">Approved</option>
+        <option value="done">Done</option>
+        <option value="rejected">Rejected</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+    <div class="bdash-filter-field">
+      <label for="dashboardFilterDoctor">Doctor</label>
+      <select id="dashboardFilterDoctor" class="form-select">
+        <option value="0">All doctors</option>
+      </select>
+    </div>
+    <div class="bdash-filter-field">
+      <label for="dashboardFilterDateFrom">Date From</label>
+      <input type="date" id="dashboardFilterDateFrom" class="form-control">
+    </div>
+    <div class="bdash-filter-field">
+      <label for="dashboardFilterDateTo">Date To</label>
+      <input type="date" id="dashboardFilterDateTo" class="form-control">
+    </div>
+    <div class="bdash-filter-actions">
+      <button type="button" class="btn btn-light" id="dashboardFilterResetBtn">Reset</button>
+      <button type="button" class="btn btn-primary" id="dashboardFilterApplyBtn" data-bs-dismiss="offcanvas">Apply</button>
     </div>
   </div>
 </div>
@@ -264,15 +579,33 @@ document.addEventListener('DOMContentLoaded', function () {
     actions: document.getElementById('dashboardActions'),
     loader: document.getElementById('dashboardLoader'),
     content: document.getElementById('dashboardContent'),
-    stats: document.getElementById('dashboardStats'),
+    adminOverview: document.getElementById('dashboardAdminOverview'),
+    adminCards: document.getElementById('dashboardAdminCards'),
+    adminTrend: document.getElementById('dashboardAdminTrend'),
+    adminSnapshot: document.getElementById('dashboardAdminSnapshot'),
     recentTitle: document.getElementById('dashboardRecentTitle'),
     recentSubtitle: document.getElementById('dashboardRecentSubtitle'),
     recentBody: document.getElementById('dashboardRecentBody'),
-    highlights: document.getElementById('dashboardHighlights')
+    highlightsTitle: document.getElementById('dashboardHighlightsTitle'),
+    highlightsSubtitle: document.getElementById('dashboardHighlightsSubtitle'),
+    highlights: document.getElementById('dashboardHighlights'),
+    filterStatus: document.getElementById('dashboardFilterStatus'),
+    filterDoctor: document.getElementById('dashboardFilterDoctor'),
+    filterDateFrom: document.getElementById('dashboardFilterDateFrom'),
+    filterDateTo: document.getElementById('dashboardFilterDateTo'),
+    filterReset: document.getElementById('dashboardFilterResetBtn'),
+    filterApply: document.getElementById('dashboardFilterApplyBtn')
   };
 
   let currentRole = 'patient';
   const rowsById = new Map();
+  const state = {
+    status: 'all',
+    doctor_id: '0',
+    date_from: '',
+    date_to: '',
+    doctorOptions: []
+  };
 
   function authHeaders(extra = {}) {
     return Object.assign({
@@ -298,28 +631,31 @@ document.addEventListener('DOMContentLoaded', function () {
       .replace(/'/g, '&#039;');
   }
 
+  function formatNumber(value) {
+    return Number(value || 0).toLocaleString();
+  }
+
   function statusBadge(status) {
     const key = String(status || 'pending').toLowerCase();
     const label = key.charAt(0).toUpperCase() + key.slice(1);
     return `<span class="bdash-pill ${esc(key)}">${esc(label)}</span>`;
   }
 
-  function renderStats(counts) {
-    const items = [
-      ['Total', counts.total || 0],
-      ['Pending', counts.pending || 0],
-      ['Approved', counts.approved || 0],
-      ['Done', counts.done || 0],
-      ['Rejected', counts.rejected || 0],
-      ['Cancelled', counts.cancelled || 0]
-    ];
+  function buildParams() {
+    const params = new URLSearchParams();
+    if (state.status && state.status !== 'all') params.set('status', state.status);
+    if (state.doctor_id && state.doctor_id !== '0') params.set('doctor_id', state.doctor_id);
+    if (state.date_from) params.set('date_from', state.date_from);
+    if (state.date_to) params.set('date_to', state.date_to);
+    return params.toString();
+  }
 
-    els.stats.innerHTML = items.map(([label, value]) => `
-      <div class="bdash-stat">
-        <div class="bdash-stat-label">${esc(label)}</div>
-        <div class="bdash-stat-value">${esc(value)}</div>
-      </div>
+  function renderDoctorOptions(options) {
+    state.doctorOptions = Array.isArray(options) ? options : [];
+    els.filterDoctor.innerHTML = '<option value="0">All doctors</option>' + state.doctorOptions.map((item) => `
+      <option value="${esc(item.id)}">${esc(item.name)}</option>
     `).join('');
+    els.filterDoctor.value = state.doctor_id;
   }
 
   function renderActions(role, links) {
@@ -341,22 +677,153 @@ document.addEventListener('DOMContentLoaded', function () {
     `).join('');
   }
 
-  function renderHighlights(role, counts) {
-    const items = role === 'admin'
-      ? [
-          `There are <strong>${esc(counts.pending || 0)} pending</strong> bookings waiting for admin action.`,
-          `Completed bookings are now tracked as <strong>${esc(counts.done || 0)} done</strong> entries.`,
-          `Use Manage Bookings to approve or reject requests with notes that patients can read later.`
-        ]
-      : [
-          `You have created <strong>${esc(counts.total || 0)} bookings</strong> from this account.`,
-          `After a doctor visit is finished, mark the booking as <strong>Done</strong> and leave a review.`,
-          `Open My Bookings anytime to view full details, filters, notes, and review status.`
-        ];
+  function renderAdminOverview(overview, counts) {
+    if (currentRole !== 'admin' || !overview) {
+      els.adminOverview.style.display = 'none';
+      els.adminCards.innerHTML = '';
+      els.adminTrend.innerHTML = '';
+      els.adminSnapshot.innerHTML = '';
+      return;
+    }
 
-    els.highlights.innerHTML = items.map((text) => `
-      <div class="bdash-list-item"><span>${text}</span></div>
+    els.adminOverview.style.display = '';
+
+    const toneClass = {
+      primary: 'bdash-tone-primary',
+      warning: 'bdash-tone-warning',
+      success: 'bdash-tone-success',
+      info: 'bdash-tone-info',
+      violet: 'bdash-tone-violet',
+      neutral: 'bdash-tone-neutral'
+    };
+
+    els.adminCards.innerHTML = (overview.cards || []).map((card) => `
+      <article class="bdash-metric-card ${toneClass[card.tone] || 'bdash-tone-primary'}">
+        <div class="bdash-metric-card-top">
+          <div>
+            <span>${esc(card.label || '')}</span>
+            <strong>${formatNumber(card.value || 0)}</strong>
+          </div>
+          <i class="fa ${esc(card.icon || 'fa-chart-line')} bdash-metric-icon" aria-hidden="true"></i>
+        </div>
+        <p>${esc(card.meta || '')}</p>
+      </article>
     `).join('');
+
+    const trend = Array.isArray(overview.trend) ? overview.trend : [];
+    const maxTotal = Math.max(1, ...trend.map((item) => Number(item.total || 0)));
+    els.adminTrend.innerHTML = trend.length ? `
+      <div class="bdash-trend-bars">
+        ${trend.map((item) => {
+          const totalHeight = Math.max(6, Math.round((Number(item.total || 0) / maxTotal) * 100));
+          const doneHeight = Math.max(item.done ? 6 : 0, Math.round((Number(item.done || 0) / maxTotal) * 100));
+          return `
+            <div class="bdash-trend-col">
+              <div class="bdash-trend-track">
+                <span class="bdash-trend-bar total" style="height:${totalHeight}%"></span>
+                <span class="bdash-trend-bar done" style="height:${doneHeight}%"></span>
+              </div>
+              <div class="bdash-trend-label">${esc(item.label || '')}</div>
+              <div class="bdash-trend-value">${formatNumber(item.total || 0)}</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : `<div class="bdash-empty">No booking activity available yet.</div>`;
+
+    const distribution = overview.status_distribution || counts || {};
+    const total = Math.max(1, Number(distribution.total || 0));
+    const selfCount = Number(overview.booking_mix?.self || 0);
+    const familyCount = Number(overview.booking_mix?.family || 0);
+    const mixTotal = Math.max(1, selfCount + familyCount);
+    const reviewAverage = Number(overview.reviews?.average_rating || 0).toFixed(1);
+
+    els.adminSnapshot.innerHTML = `
+      <div class="bdash-snapshot-block">
+        <div class="bdash-snapshot-row">
+          <span>New bookings today</span>
+          <strong>${formatNumber(overview.today?.new_bookings || 0)}</strong>
+        </div>
+        <div class="bdash-snapshot-row">
+          <span>Appointments today</span>
+          <strong>${formatNumber(overview.today?.appointments || 0)}</strong>
+        </div>
+        <div class="bdash-snapshot-row">
+          <span>Total doctor reviews</span>
+          <strong>${formatNumber(overview.reviews?.total || 0)}</strong>
+        </div>
+        <div class="bdash-snapshot-row">
+          <span>Average rating</span>
+          <strong>${esc(reviewAverage)}/5</strong>
+        </div>
+      </div>
+      <div class="bdash-snapshot-block">
+        <div class="bdash-progress-row">
+          <div class="bdash-progress-copy">
+            <span>Self bookings</span>
+            <strong>${formatNumber(selfCount)}</strong>
+          </div>
+          <div class="bdash-progress-track"><span class="bdash-progress-fill" style="width:${Math.round((selfCount / mixTotal) * 100)}%"></span></div>
+        </div>
+        <div class="bdash-progress-row">
+          <div class="bdash-progress-copy">
+            <span>Family bookings</span>
+            <strong>${formatNumber(familyCount)}</strong>
+          </div>
+          <div class="bdash-progress-track"><span class="bdash-progress-fill is-violet" style="width:${Math.round((familyCount / mixTotal) * 100)}%"></span></div>
+        </div>
+      </div>
+      <div class="bdash-progress-group">
+        ${[
+          ['Pending', distribution.pending || 0, 'is-warning'],
+          ['Approved', distribution.approved || 0, ''],
+          ['Done', distribution.done || 0, 'is-success'],
+          ['Rejected', distribution.rejected || 0, 'is-danger'],
+          ['Cancelled', distribution.cancelled || 0, 'is-neutral']
+        ].map(([label, value, klass]) => `
+          <div class="bdash-progress-row">
+            <div class="bdash-progress-copy">
+              <span>${esc(label)}</span>
+              <strong>${formatNumber(value)}</strong>
+            </div>
+            <div class="bdash-progress-track"><span class="bdash-progress-fill ${klass}" style="width:${Math.round((Number(value || 0) / total) * 100)}%"></span></div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  function renderHighlights(role, counts, overview) {
+    if (role === 'admin') {
+      els.highlightsTitle.textContent = 'Top Doctors';
+      els.highlightsSubtitle.textContent = 'The busiest doctors in the current booking dataset.';
+      const doctors = Array.isArray(overview?.top_doctors) ? overview.top_doctors : [];
+      els.highlights.innerHTML = doctors.length ? doctors.map((doctor, index) => `
+        <div class="bdash-list-item">
+          <div class="bdash-top-line">
+            <span>${esc((index + 1) + '. ' + (doctor.name || 'Doctor'))}</span>
+            <span>${formatNumber(doctor.total_bookings || 0)} bookings</span>
+          </div>
+          <div class="bdash-top-meta">
+            <span>Done: ${formatNumber(doctor.done_bookings || 0)}</span>
+            <span>Pending: ${formatNumber(doctor.pending_bookings || 0)}</span>
+            <span>Treated: ${formatNumber(doctor.total_patients_treated || 0)}</span>
+            <span>Rating: ${esc(Number(doctor.average_rating || 0).toFixed(1))}/5</span>
+          </div>
+        </div>
+      `).join('') : `<div class="bdash-empty">No doctor activity available yet.</div>`;
+      return;
+    }
+
+    els.highlightsTitle.textContent = 'Quick View';
+    els.highlightsSubtitle.textContent = 'Important booking context at a glance.';
+    const items = [
+      `Bookings created from this account: <strong>${esc(counts.total || 0)}</strong>.`,
+      `Reviews can be submitted after admin marks a booking as <strong>Done</strong>.`,
+      `Use the filter drawer to focus on one doctor, one date range, or one booking status.`
+    ];
+
+    els.highlights.innerHTML = items.map((text) => `<div class="bdash-list-item"><span>${text}</span></div>`).join('');
   }
 
   function showClinicDetails(item) {
@@ -418,8 +885,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
       `,
       didOpen: () => {
-        const button = document.getElementById('dashboardClinicDetailsBtn');
-        button?.addEventListener('click', function () {
+        document.getElementById('dashboardClinicDetailsBtn')?.addEventListener('click', function () {
           showClinicDetails(item);
         });
       },
@@ -432,7 +898,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!item) return;
 
     const result = await Swal.fire({
-      title: 'Rate Dr. ' + (item.doctor_name || 'Doctor'),
+      title: 'Review Dr. ' + (item.doctor_name || 'Doctor'),
       width: 620,
       html: `
         <div class="text-start">
@@ -511,9 +977,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!Array.isArray(items) || !items.length) {
       els.recentBody.innerHTML = `
         <tr>
-          <td colspan="5">
-            <div class="bdash-empty">No bookings found yet.</div>
-          </td>
+          <td colspan="5"><div class="bdash-empty">No bookings found for the selected filters.</div></td>
         </tr>
       `;
       return;
@@ -539,7 +1003,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <td>
           <div class="bdash-row-actions">
             <button type="button" class="btn btn-light btn-sm js-dashboard-details" data-id="${esc(item.id)}"><i class="fa fa-eye me-1"></i>Details</button>
-            ${currentRole === 'patient' && item.can_review ? `<button type="button" class="btn btn-primary btn-sm js-dashboard-review" data-id="${esc(item.id)}"><i class="fa fa-star me-1"></i>Review</button>` : ''}
+            ${currentRole === 'patient' && item.can_review ? `<button type="button" class="btn btn-success btn-sm js-dashboard-review" data-id="${esc(item.id)}"><i class="fa fa-star me-1"></i>Review</button>` : ''}
             ${currentRole === 'admin' ? `<a href="/bookings/manage" class="btn btn-primary btn-sm"><i class="fa fa-arrow-up-right-from-square me-1"></i>Manage</a>` : ''}
           </div>
         </td>
@@ -549,9 +1013,24 @@ document.addEventListener('DOMContentLoaded', function () {
     bindRecentActions();
   }
 
+  function syncDrawerFields() {
+    els.filterStatus.value = state.status;
+    els.filterDoctor.value = state.doctor_id;
+    els.filterDateFrom.value = state.date_from;
+    els.filterDateTo.value = state.date_to;
+  }
+
+  function applyDrawerFields() {
+    state.status = els.filterStatus.value || 'all';
+    state.doctor_id = els.filterDoctor.value || '0';
+    state.date_from = els.filterDateFrom.value || '';
+    state.date_to = els.filterDateTo.value || '';
+  }
+
   async function loadDashboard() {
     try {
-      const res = await fetch('/api/bookings/dashboard', { headers: authHeaders() });
+      const qs = buildParams();
+      const res = await fetch('/api/bookings/dashboard' + (qs ? '?' + qs : ''), { headers: authHeaders() });
       const data = await res.json().catch(() => ({}));
 
       if (res.status === 401) {
@@ -565,22 +1044,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
       currentRole = data.role || 'patient';
       const counts = data.counts || {};
-      const links = data.links || {};
-      const recent = Array.isArray(data.recent) ? data.recent : [];
+      const adminOverview = data.admin_overview || null;
 
       els.title.textContent = currentRole === 'admin' ? 'Admin Booking Dashboard' : 'My Booking Dashboard';
       els.subtitle.textContent = currentRole === 'admin'
-        ? 'Review booking requests, check detailed status, and keep the booking queue moving.'
-        : 'Track your appointment requests, mark visits as done, and review doctors after your care journey is complete.';
+        ? 'Monitor system-wide bookings, review operational activity, and manage the appointment pipeline.'
+        : 'Track appointment requests, filter recent bookings, and review doctors after visits are marked done.';
       els.recentTitle.textContent = currentRole === 'admin' ? 'Latest booking requests' : 'Recent bookings';
       els.recentSubtitle.textContent = currentRole === 'admin'
-        ? 'Newest appointment activity across the platform.'
-        : 'Recent booking activity from your account, including review-ready visits.';
+        ? 'Newest booking activity across the platform.'
+        : 'Newest booking activity from your account.';
 
-      renderActions(currentRole, links);
-      renderStats(counts);
-      renderRecent(recent);
-      renderHighlights(currentRole, counts);
+      renderActions(currentRole, data.links || {});
+      renderDoctorOptions(data.doctor_options || []);
+      renderAdminOverview(adminOverview, counts);
+      renderRecent(data.recent || []);
+      renderHighlights(currentRole, counts, adminOverview);
+      syncDrawerFields();
 
       els.loader.style.display = 'none';
       els.content.style.display = '';
@@ -588,6 +1068,20 @@ document.addEventListener('DOMContentLoaded', function () {
       els.loader.innerHTML = `<div class="bdash-empty">${esc(error.message || 'Unable to load dashboard.')}</div>`;
     }
   }
+
+  els.filterApply.addEventListener('click', function () {
+    applyDrawerFields();
+    loadDashboard();
+  });
+
+  els.filterReset.addEventListener('click', function () {
+    state.status = 'all';
+    state.doctor_id = '0';
+    state.date_from = '';
+    state.date_to = '';
+    syncDrawerFields();
+    loadDashboard();
+  });
 
   loadDashboard();
 });

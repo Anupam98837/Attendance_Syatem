@@ -17,6 +17,10 @@
   @yield('styles')
 
   <style>
+    *, *::before, *::after{
+      box-sizing:border-box;
+    }
+
     :root{
       --w3-rail-w: 236px;
       --w3-rail-bg: var(--surface);
@@ -36,6 +40,7 @@
       background:var(--bg-body);
       color:var(--text-color);
       overflow-x:hidden;
+      max-width:100%;
     }
 
     .w3-sidebar{
@@ -48,7 +53,7 @@
       flex-direction:column;
       z-index:1041;
       transform:translateX(0);
-      transition:transform .24s ease;
+      transition:transform .28s cubic-bezier(.4,0,.2,1);
     }
 
     .w3-sidebar-head{
@@ -244,11 +249,12 @@
       border-bottom:1px solid var(--line-strong);
       display:flex;
       align-items:center;
-      transition:box-shadow .18s ease, background .18s ease;
+      transition:box-shadow .22s ease, background .22s ease;
+      animation:fadeInDown .38s ease both;
     }
 
     .w3-appbar.w3-appbar-scrolled{
-      box-shadow:var(--shadow-1);
+      box-shadow:0 4px 18px rgba(15,23,42,.08);
     }
 
     .w3-appbar-inner{
@@ -289,15 +295,15 @@
     }
 
     .w3-icon-btn{
-      width:30px;
-      height:30px;
+      width:34px;
+      height:34px;
       display:inline-grid;
       place-items:center;
       border:1px solid var(--line-strong);
       background:var(--surface);
       color:var(--secondary-color);
       border-radius:var(--radius-1);
-      transition:transform .16s ease, background .16s ease, border-color .16s ease;
+      transition:transform .16s ease, background .16s ease, border-color .16s ease, box-shadow .16s ease;
       padding:0;
       box-shadow:none;
     }
@@ -310,6 +316,7 @@
     .w3-icon-btn:hover{
       background:var(--page-hover);
       transform:translateY(-1px);
+      box-shadow:0 4px 12px rgba(15,23,42,.08);
     }
 
     .w3-notify-btn{
@@ -340,12 +347,12 @@
     }
 
     .w3-profile-link{
-      width:34px;
-      height:34px;
+      width:36px;
+      height:36px;
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      border:1px solid var(--line-strong);
+      border:1.5px solid var(--line-strong);
       background:var(--surface);
       border-radius:999px;
       overflow:hidden;
@@ -381,8 +388,8 @@
     }
 
     .w3-hamburger{
-      width:30px;
-      height:30px;
+      width:36px;
+      height:36px;
       border:1px solid var(--line-strong);
       border-radius:var(--radius-1);
       background:var(--surface);
@@ -391,6 +398,12 @@
       cursor:pointer;
       padding:0;
       box-shadow:none;
+      transition:background .16s ease, transform .16s ease;
+    }
+
+    .w3-hamburger:hover{
+      background:var(--page-hover);
+      transform:scale(1.04);
     }
 
     .w3-bars{
@@ -425,9 +438,24 @@
     }
 
     .w3-content{
+      width:100%;
+      max-width:100%;
+      min-width:0;
       padding:12px;
       margin-inline:auto;
+      overflow-x:clip;
       transition:padding .24s ease;
+    }
+
+    .panel{
+      width:100%;
+      max-width:100%;
+      min-width:0;
+    }
+
+    .w3-content .row,
+    .w3-content [class*="col-"]{
+      min-width:0;
     }
 
     .w3-content.w3-disabled-content{
@@ -488,8 +516,20 @@
         display:flex;
       }
 
+      /* On mobile the overlay covers the full viewport (behind the sidebar) */
       .w3-overlay{
-        left:var(--w3-rail-w);
+        left:0;
+      }
+
+      /* Show profile link on mobile */
+      .w3-profile-link{
+        display:inline-flex!important;
+      }
+    }
+
+    @media (max-width: 575px){
+      .w3-appbar-inner{
+        padding:0 8px;
       }
     }
 
@@ -659,6 +699,14 @@
     html.theme-dark .w3-notif-item.is-unread{
       background:linear-gradient(180deg, rgba(59,130,246,.08), rgba(15,23,42,.96));
     }
+
+    /* ── Page content entrance ── */
+    .w3-content{
+      animation:fadeInUp .38s .08s ease both;
+    }
+
+    @keyframes fadeInDown{from{opacity:0;transform:translateY(-14px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
   </style>
 
   <style>
@@ -2002,6 +2050,23 @@ document.addEventListener('DOMContentLoaded', () => {
       loadHeaderNotifications();
     }
   }, 60000);
+
+  // ── Scroll-hint for wide tables ──
+  function applyTableScrollHints(root) {
+    (root || document).querySelectorAll('.table-responsive').forEach(function(wrap) {
+      function check() {
+        wrap.classList.toggle('has-scroll-hint', wrap.scrollWidth > wrap.clientWidth && wrap.scrollLeft < (wrap.scrollWidth - wrap.clientWidth - 4));
+      }
+      check();
+      wrap.addEventListener('scroll', check, { passive: true });
+      new ResizeObserver(check).observe(wrap);
+    });
+  }
+
+  applyTableScrollHints(document);
+
+  // Re-run after dynamic content renders (e.g. sidebar menu done → page JS adds table rows)
+  setTimeout(function() { applyTableScrollHints(document); }, 800);
 });
 </script>
 
