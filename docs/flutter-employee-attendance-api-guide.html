@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flutter Employee Attendance App API Guide</title>
+  <style>
+    :root{
+      --bg:#f4f7fb;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#475569;
+      --line:#dbe3ee;
+      --brand:#0f766e;
+      --brand-soft:#ecfeff;
+      --code:#0b1220;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:var(--bg);
+      color:var(--ink);
+      line-height:1.6;
+    }
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:32px 20px 60px;
+    }
+    .hero,.card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:22px;
+      box-shadow:0 14px 34px rgba(15, 23, 42, 0.06);
+    }
+    .hero{
+      padding:30px;
+      background:linear-gradient(135deg, rgba(15,118,110,.08), rgba(14,165,233,.08));
+    }
+    .card{padding:24px; margin-top:18px}
+    h1,h2,h3{margin:0 0 12px}
+    h1{font-size:34px}
+    h2{font-size:24px; margin-top:6px}
+    h3{font-size:18px}
+    p{margin:0 0 12px}
+    .muted{color:var(--muted)}
+    .pill{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:var(--brand-soft);
+      color:var(--brand);
+      font-weight:700;
+      font-size:12px;
+      margin:0 8px 8px 0;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:18px;
+    }
+    .grid-3{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:14px;
+    }
+    .mini{
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:16px;
+      background:#fafcff;
+    }
+    .endpoint{
+      border-top:1px solid var(--line);
+      padding-top:18px;
+      margin-top:18px;
+    }
+    .endpoint:first-child{
+      border-top:none;
+      padding-top:0;
+      margin-top:0;
+    }
+    .method{
+      display:inline-block;
+      min-width:58px;
+      text-align:center;
+      padding:4px 8px;
+      border-radius:10px;
+      background:#dcfce7;
+      color:#166534;
+      font-weight:800;
+      font-size:12px;
+      margin-right:8px;
+    }
+    .post{background:#dbeafe;color:#1d4ed8}
+    .code{
+      background:var(--code);
+      color:#e2e8f0;
+      border-radius:16px;
+      padding:16px;
+      overflow:auto;
+      font-family:Menlo, Monaco, Consolas, monospace;
+      font-size:13px;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:10px;
+    }
+    th,td{
+      border:1px solid var(--line);
+      padding:10px 12px;
+      text-align:left;
+      vertical-align:top;
+      font-size:14px;
+    }
+    th{background:#f8fafc}
+    ul{margin:0; padding-left:18px}
+    .flow{
+      padding:14px 16px;
+      border-radius:16px;
+      background:#f8fafc;
+      border:1px dashed #cbd5e1;
+      font-weight:700;
+    }
+    @media (max-width: 860px){
+      .grid,.grid-3{grid-template-columns:1fr}
+      h1{font-size:28px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="pill">Employee Flutter App Scope</div>
+      <div class="pill">Attendance Only</div>
+      <div class="pill">Backend Ready</div>
+      <h1>Flutter Employee Attendance App API Guide</h1>
+      <p class="muted">
+        This document is the direct handoff for the employee mobile app. The app scope is only:
+        login, profile/home page, check-in, check-out, active attendance status, and attendance history.
+      </p>
+      <div class="flow">
+        Login → Fetch profile/bootstrap → Show home screen → Check In / Check Out → Show active session →
+        Show attendance history
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>1. App Scope</h2>
+      <div class="grid-3">
+        <div class="mini">
+          <h3>Login</h3>
+          <p class="muted">Employee logs in with email or phone number and password.</p>
+        </div>
+        <div class="mini">
+          <h3>Home</h3>
+          <p class="muted">Show profile, branch, shift, current policy, today attendance state, and live session.</p>
+        </div>
+        <div class="mini">
+          <h3>Attendance</h3>
+          <p class="muted">Allow check-in and check-out with GPS, selfie, device ID, request IP, and remarks.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>2. Base Rules</h2>
+      <table>
+        <tr><th>Item</th><th>Value</th></tr>
+        <tr><td>Base URL</td><td><code>http://your-domain.com/api</code></td></tr>
+        <tr><td>Auth Type</td><td>Bearer token</td></tr>
+        <tr><td>Employee Role</td><td><code>employee</code></td></tr>
+        <tr><td>Required Header</td><td><code>Authorization: Bearer {token}</code></td></tr>
+        <tr><td>Content Type</td><td><code>application/json</code> except selfie upload, which uses <code>multipart/form-data</code></td></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>3. Recommended Flutter Screen Flow</h2>
+      <div class="code">1. Login Screen
+2. Home / Dashboard Screen
+   - Employee name
+   - Employee code
+   - Branch
+   - Shift
+   - Attendance policy flags
+   - Today check-in/check-out
+   - Current attendance state
+3. Check In / Check Out Action
+4. Attendance History Screen</div>
+    </section>
+
+    <section class="card">
+      <h2>4. APIs To Use</h2>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/auth/login</h3>
+        <p>Login using email or phone number.</p>
+        <div class="code">{
+  "login": "employee@gmail.com",
+  "password": "employee@123",
+  "remember": true
+}</div>
+        <p>Success response:</p>
+        <div class="code">{
+  "status": "success",
+  "message": "Login successful",
+  "access_token": "TOKEN_VALUE",
+  "token_type": "Bearer",
+  "expires_at": "2026-05-09T08:00:00+00:00",
+  "user": {
+    "id": 12,
+    "uuid": "user-uuid",
+    "name": "Rahul Das",
+    "email": "employee@gmail.com",
+    "phone_number": "9000000002",
+    "role": "employee",
+    "status": "active"
+  }
+}</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/auth/profile</h3>
+        <p>Get logged-in user profile after login.</p>
+        <p>Header:</p>
+        <div class="code">Authorization: Bearer TOKEN_VALUE</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/bootstrap</h3>
+        <p>Use this immediately after login to build the employee home screen.</p>
+        <p>Main things returned:</p>
+        <ul>
+          <li>Company settings</li>
+          <li>Employee profile</li>
+          <li>Assigned branch</li>
+          <li>Shift info</li>
+          <li>Attendance policy flags</li>
+          <li>Allowed branch IP patterns</li>
+          <li>Today attendance</li>
+          <li>Server time</li>
+        </ul>
+        <p>Important fields to use on home page:</p>
+        <div class="code">data.employee.name
+data.employee.employee_code
+data.employee.branch_name
+data.employee.shift_name
+data.employee.attendance_policy_name
+data.employee.gps_required
+data.employee.selfie_required
+data.employee.device_binding_required
+data.employee.geofence_required
+data.employee.wifi_ip_restriction_required
+data.employee.branch_networks
+data.today_attendance</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/request-ip</h3>
+        <p>Get the server-detected request IP before check-in or check-out.</p>
+        <div class="code">{
+  "status": "success",
+  "data": {
+    "request_ip": "49.36.120.10",
+    "is_loopback": false,
+    "hint": null,
+    "server_time": "2026-05-08T12:20:11+05:30"
+  }
+}</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/active-session</h3>
+        <p>Use on home page refresh and after a punch to show the active day session.</p>
+        <p>Main returned blocks:</p>
+        <ul>
+          <li><code>data.attendance</code></li>
+          <li><code>data.tracks</code></li>
+        </ul>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/attendance/mobile/punch</h3>
+        <p>Use for both check-in and check-out. This is the main attendance API.</p>
+        <p>Content type: <code>multipart/form-data</code></p>
+        <p>Recommended payload:</p>
+        <div class="code">punch_type = check_in | check_out
+attendance_mode = online
+work_mode = office | field | wfh | hybrid
+occurred_at = 2026-05-08T10:05:00+05:30
+internet_status = online
+network_type = wifi
+remarks = Optional remark
+latitude = 22.5728
+longitude = 88.3641
+gps_accuracy_meters = 14
+location_text = Kolkata Office Gate 1
+device_id = flutter-device-001
+device_name = Samsung Galaxy S24
+device_platform = android
+device_model = SM-S921B
+app_version = 1.0.0
+selfie = [multipart image file]</div>
+        <p>Sample success response:</p>
+        <div class="code">{
+  "status": "success",
+  "message": "Attendance punch processed successfully.",
+  "data": {
+    "attendance": {
+      "id": 35,
+      "attendance_date": "2026-05-08",
+      "check_in_time": "2026-05-08 10:05:00",
+      "check_out_time": null,
+      "status": "present",
+      "approval_status": "approved",
+      "attendance_mode": "online",
+      "work_mode": "office"
+    },
+    "exceptions": []
+  }
+}</div>
+        <p>Possible exception values:</p>
+        <div class="code">outside_geofence
+wifi_ip_not_allowed
+selfie_missing
+device_id_missing
+gps_missing</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/history</h3>
+        <p>Use for the attendance history page.</p>
+        <p>Supported query params:</p>
+        <div class="code">?from=2026-05-01&amp;to=2026-05-31&amp;status=present&amp;per_page=20</div>
+        <p>Response structure:</p>
+        <div class="code">{
+  "status": "success",
+  "data": [
+    {
+      "id": 35,
+      "attendance_date": "2026-05-08",
+      "check_in_time": "2026-05-08 10:05:00",
+      "check_out_time": "2026-05-08 18:08:00",
+      "total_working_minutes": 483,
+      "late_minutes": 5,
+      "status": "late",
+      "attendance_mode": "online",
+      "approval_status": "approved"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 20,
+    "total": 24,
+    "last_page": 2
+  }
+}</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5. Home Page Data Mapping</h2>
+      <table>
+        <tr><th>Flutter Widget</th><th>API Source</th></tr>
+        <tr><td>Employee name</td><td><code>/attendance/mobile/bootstrap → data.employee.name</code></td></tr>
+        <tr><td>Employee code</td><td><code>/attendance/mobile/bootstrap → data.employee.employee_code</code></td></tr>
+        <tr><td>Branch name</td><td><code>/attendance/mobile/bootstrap → data.employee.branch_name</code></td></tr>
+        <tr><td>Shift name</td><td><code>/attendance/mobile/bootstrap → data.employee.shift_name</code></td></tr>
+        <tr><td>Today check-in</td><td><code>/attendance/mobile/bootstrap → data.today_attendance.check_in_time</code></td></tr>
+        <tr><td>Today check-out</td><td><code>/attendance/mobile/bootstrap → data.today_attendance.check_out_time</code></td></tr>
+        <tr><td>Current session</td><td><code>/attendance/mobile/active-session</code></td></tr>
+        <tr><td>IP validation hint</td><td><code>/attendance/mobile/request-ip</code></td></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>6. Recommended Flutter Check-In Flow</h2>
+      <div class="code">1. Load bootstrap
+2. Load request-ip
+3. Read current GPS
+4. Read current device ID
+5. Open direct camera capture
+6. Collect selfie image
+7. POST /attendance/mobile/punch with punch_type=check_in
+8. Reload /attendance/mobile/active-session
+9. Update home page state</div>
+    </section>
+
+    <section class="card">
+      <h2>7. Recommended Flutter Check-Out Flow</h2>
+      <div class="code">1. Load request-ip
+2. Read current GPS
+3. Reuse saved device ID
+4. Open direct camera capture if policy requires checkout selfie
+5. POST /attendance/mobile/punch with punch_type=check_out
+6. Reload /attendance/mobile/active-session
+7. Refresh history list if open</div>
+    </section>
+
+    <section class="card">
+      <h2>8. Required App Fields To Store Locally</h2>
+      <table>
+        <tr><th>Key</th><th>Why</th></tr>
+        <tr><td><code>access_token</code></td><td>API authentication</td></tr>
+        <tr><td><code>role</code></td><td>Should be <code>employee</code></td></tr>
+        <tr><td><code>device_id</code></td><td>Stable attendance device identity</td></tr>
+        <tr><td><code>employee_profile</code></td><td>Home page and punch rules</td></tr>
+        <tr><td><code>today_attendance</code></td><td>Fast dashboard refresh</td></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>9. Minimal Flutter Modules Needed</h2>
+      <div class="grid">
+        <div class="mini">
+          <h3>Auth Module</h3>
+          <p class="muted">Login API, token storage, role validation, logout.</p>
+        </div>
+        <div class="mini">
+          <h3>Profile Module</h3>
+          <p class="muted">Load bootstrap and profile data for the employee home page.</p>
+        </div>
+        <div class="mini">
+          <h3>Attendance Module</h3>
+          <p class="muted">Check-in, check-out, active session refresh, and punch state management.</p>
+        </div>
+        <div class="mini">
+          <h3>History Module</h3>
+          <p class="muted">Fetch paginated attendance history with date/status filters.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>10. Notes For Flutter Build</h2>
+      <ul>
+        <li>Use direct camera capture for selfie. Do not use file picker.</li>
+        <li>Use a persistent generated device ID and reuse it on every punch.</li>
+        <li>Before each punch, refresh the request IP from the backend.</li>
+        <li>Always send GPS if available.</li>
+        <li>Render SQL date/time fields in company timezone using AM/PM format.</li>
+        <li>The employee app scope does not need leave screens, notifications, or admin modules right now.</li>
+      </ul>
+    </section>
+  </div>
+</body>
+</html>

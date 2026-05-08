@@ -1,35 +1,28 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\DepartmentController;
+use App\Http\Controllers\API\AttendanceEmployeeController;
+use App\Http\Controllers\API\AttendanceMobileController;
+use App\Http\Controllers\API\AttendanceOperationsController;
+use App\Http\Controllers\API\AttendanceSetupController;
 use App\Http\Controllers\API\DashboardMenuController;
-use App\Http\Controllers\API\ClinicController;
-use App\Http\Controllers\API\BookingController;
-use App\Http\Controllers\API\DoctorProfileController;
-use App\Http\Controllers\API\HospitalController;
+use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\PagePrivilegeController;
-use App\Http\Controllers\API\ReferenceMasterController;
 use App\Http\Controllers\API\RolePrivilegeController;
 use App\Http\Controllers\API\UserController;
 use App\Http\Controllers\API\UserPrivilegeController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
 Route::prefix('auth')->group(function () {
-    // public
     Route::post('/login', [UserController::class, 'login']);
-    Route::post('/register', [UserController::class, 'patientRegister']);
-    Route::post('/patient-register', [UserController::class, 'patientRegister']);
-
-    // optional backward compatibility
-    Route::post('/student-register', [UserController::class, 'studentRegister']);
+    Route::post('/register', [UserController::class, 'register']);
 
     Route::get('/check', [UserController::class, 'authenticateToken']);
 
-    // protected
     Route::middleware('checkAuth')->group(function () {
         Route::post('/logout', [UserController::class, 'logout']);
         Route::get('/me-role', [UserController::class, 'getMyRole']);
@@ -53,7 +46,6 @@ Route::middleware('checkAuth')->prefix('users')->group(function () {
 
     Route::patch('/{id}/password', [UserController::class, 'updatePassword']);
     Route::post('/{id}/image', [UserController::class, 'updateImage']);
-
     Route::post('/{uuid}/cv', [UserController::class, 'uploadCvByUuid']);
     Route::post('/import-csv', [UserController::class, 'importUsersCsv']);
 });
@@ -118,130 +110,120 @@ Route::middleware('checkAuth')->group(function () {
         Route::delete('/', [RolePrivilegeController::class, 'destroy']);
     });
 
-    Route::prefix('departments')->group(function () {
-        Route::get('/', [DepartmentController::class, 'index']);
-        Route::get('/all', [DepartmentController::class, 'all']);
-        Route::get('/archived', [DepartmentController::class, 'archived']);
-        Route::get('/bin', [DepartmentController::class, 'bin']);
-        Route::post('/', [DepartmentController::class, 'store']);
-        Route::get('/{identifier}', [DepartmentController::class, 'show']);
-        Route::match(['put', 'patch'], '/{identifier}', [DepartmentController::class, 'update']);
-        Route::delete('/{identifier}', [DepartmentController::class, 'destroy']);
-        Route::post('/{identifier}/restore', [DepartmentController::class, 'restore']);
-        Route::delete('/{identifier}/force', [DepartmentController::class, 'forceDelete']);
-    });
-
-    Route::prefix('hospitals')->group(function () {
-        Route::get('/', [HospitalController::class, 'index']);
-        Route::get('/all', [HospitalController::class, 'all']);
-        Route::get('/bin', [HospitalController::class, 'bin']);
-        Route::post('/', [HospitalController::class, 'store']);
-        Route::get('/{identifier}', [HospitalController::class, 'show']);
-        Route::match(['put', 'patch'], '/{identifier}', [HospitalController::class, 'update']);
-        Route::delete('/{identifier}', [HospitalController::class, 'destroy']);
-        Route::post('/{identifier}/restore', [HospitalController::class, 'restore']);
-        Route::delete('/{identifier}/force', [HospitalController::class, 'forceDelete']);
-    });
-
-    Route::prefix('clinics')->group(function () {
-        Route::get('/', [ClinicController::class, 'index']);
-        Route::get('/all', [ClinicController::class, 'all']);
-        Route::get('/bin', [ClinicController::class, 'bin']);
-        Route::post('/', [ClinicController::class, 'store']);
-        Route::get('/{identifier}', [ClinicController::class, 'show']);
-        Route::match(['put', 'patch'], '/{identifier}', [ClinicController::class, 'update']);
-        Route::delete('/{identifier}', [ClinicController::class, 'destroy']);
-        Route::post('/{identifier}/restore', [ClinicController::class, 'restore']);
-        Route::delete('/{identifier}/force', [ClinicController::class, 'forceDelete']);
-    });
-
-    Route::prefix('doctors')->group(function () {
-        Route::get('/profile/{userUuid}', [DoctorProfileController::class, 'show']);
-        Route::post('/profile/{userUuid}', [DoctorProfileController::class, 'save']);
-    });
-
-    Route::prefix('bookings')->group(function () {
-        Route::get('/doctors/{doctorSlug}/bootstrap', [BookingController::class, 'bootstrap']);
-        Route::post('/doctors/{doctorSlug}', [BookingController::class, 'store']);
-        Route::get('/dashboard', [BookingController::class, 'dashboard']);
-        Route::get('/mine', [BookingController::class, 'myBookings']);
-        Route::post('/mine/{appointmentId}/cancel', [BookingController::class, 'cancelMyBooking']);
-        Route::post('/mine/{appointmentId}/review', [BookingController::class, 'submitReview']);
-        Route::get('/manage', [BookingController::class, 'adminIndex']);
-        Route::post('/manage/{appointmentId}/status', [BookingController::class, 'adminUpdateStatus']);
-    });
-
-    Route::prefix('specializations')->group(function () {
-        Route::get('/', [ReferenceMasterController::class, 'index'])->defaults('master', 'specializations');
-        Route::get('/all', [ReferenceMasterController::class, 'all'])->defaults('master', 'specializations');
-        Route::get('/bin', [ReferenceMasterController::class, 'bin'])->defaults('master', 'specializations');
-        Route::post('/', [ReferenceMasterController::class, 'store'])->defaults('master', 'specializations');
-        Route::get('/{identifier}', [ReferenceMasterController::class, 'show'])->defaults('master', 'specializations');
-        Route::match(['put', 'patch'], '/{identifier}', [ReferenceMasterController::class, 'update'])->defaults('master', 'specializations');
-        Route::delete('/{identifier}', [ReferenceMasterController::class, 'destroy'])->defaults('master', 'specializations');
-        Route::post('/{identifier}/restore', [ReferenceMasterController::class, 'restore'])->defaults('master', 'specializations');
-        Route::delete('/{identifier}/force', [ReferenceMasterController::class, 'forceDelete'])->defaults('master', 'specializations');
-    });
-
-    Route::prefix('designations')->group(function () {
-        Route::get('/', [ReferenceMasterController::class, 'index'])->defaults('master', 'designations');
-        Route::get('/all', [ReferenceMasterController::class, 'all'])->defaults('master', 'designations');
-        Route::get('/bin', [ReferenceMasterController::class, 'bin'])->defaults('master', 'designations');
-        Route::post('/', [ReferenceMasterController::class, 'store'])->defaults('master', 'designations');
-        Route::get('/{identifier}', [ReferenceMasterController::class, 'show'])->defaults('master', 'designations');
-        Route::match(['put', 'patch'], '/{identifier}', [ReferenceMasterController::class, 'update'])->defaults('master', 'designations');
-        Route::delete('/{identifier}', [ReferenceMasterController::class, 'destroy'])->defaults('master', 'designations');
-        Route::post('/{identifier}/restore', [ReferenceMasterController::class, 'restore'])->defaults('master', 'designations');
-        Route::delete('/{identifier}/force', [ReferenceMasterController::class, 'forceDelete'])->defaults('master', 'designations');
-    });
-
-    Route::prefix('registration-councils')->group(function () {
-        Route::get('/', [ReferenceMasterController::class, 'index'])->defaults('master', 'registration_councils');
-        Route::get('/all', [ReferenceMasterController::class, 'all'])->defaults('master', 'registration_councils');
-        Route::get('/bin', [ReferenceMasterController::class, 'bin'])->defaults('master', 'registration_councils');
-        Route::post('/', [ReferenceMasterController::class, 'store'])->defaults('master', 'registration_councils');
-        Route::get('/{identifier}', [ReferenceMasterController::class, 'show'])->defaults('master', 'registration_councils');
-        Route::match(['put', 'patch'], '/{identifier}', [ReferenceMasterController::class, 'update'])->defaults('master', 'registration_councils');
-        Route::delete('/{identifier}', [ReferenceMasterController::class, 'destroy'])->defaults('master', 'registration_councils');
-        Route::post('/{identifier}/restore', [ReferenceMasterController::class, 'restore'])->defaults('master', 'registration_councils');
-        Route::delete('/{identifier}/force', [ReferenceMasterController::class, 'forceDelete'])->defaults('master', 'registration_councils');
-    });
-
-    Route::prefix('languages')->group(function () {
-        Route::get('/', [ReferenceMasterController::class, 'index'])->defaults('master', 'languages');
-        Route::get('/all', [ReferenceMasterController::class, 'all'])->defaults('master', 'languages');
-        Route::get('/bin', [ReferenceMasterController::class, 'bin'])->defaults('master', 'languages');
-        Route::post('/', [ReferenceMasterController::class, 'store'])->defaults('master', 'languages');
-        Route::get('/{identifier}', [ReferenceMasterController::class, 'show'])->defaults('master', 'languages');
-        Route::match(['put', 'patch'], '/{identifier}', [ReferenceMasterController::class, 'update'])->defaults('master', 'languages');
-        Route::delete('/{identifier}', [ReferenceMasterController::class, 'destroy'])->defaults('master', 'languages');
-        Route::post('/{identifier}/restore', [ReferenceMasterController::class, 'restore'])->defaults('master', 'languages');
-        Route::delete('/{identifier}/force', [ReferenceMasterController::class, 'forceDelete'])->defaults('master', 'languages');
-    });
-
-    Route::prefix('services')->group(function () {
-        Route::get('/', [ReferenceMasterController::class, 'index'])->defaults('master', 'services');
-        Route::get('/all', [ReferenceMasterController::class, 'all'])->defaults('master', 'services');
-        Route::get('/bin', [ReferenceMasterController::class, 'bin'])->defaults('master', 'services');
-        Route::post('/', [ReferenceMasterController::class, 'store'])->defaults('master', 'services');
-        Route::get('/{identifier}', [ReferenceMasterController::class, 'show'])->defaults('master', 'services');
-        Route::match(['put', 'patch'], '/{identifier}', [ReferenceMasterController::class, 'update'])->defaults('master', 'services');
-        Route::delete('/{identifier}', [ReferenceMasterController::class, 'destroy'])->defaults('master', 'services');
-        Route::post('/{identifier}/restore', [ReferenceMasterController::class, 'restore'])->defaults('master', 'services');
-        Route::delete('/{identifier}/force', [ReferenceMasterController::class, 'forceDelete'])->defaults('master', 'services');
-    });
-
-    Route::prefix('qualifications')->group(function () {
-        Route::get('/', [ReferenceMasterController::class, 'index'])->defaults('master', 'qualifications');
-        Route::get('/all', [ReferenceMasterController::class, 'all'])->defaults('master', 'qualifications');
-        Route::get('/bin', [ReferenceMasterController::class, 'bin'])->defaults('master', 'qualifications');
-        Route::post('/', [ReferenceMasterController::class, 'store'])->defaults('master', 'qualifications');
-        Route::get('/{identifier}', [ReferenceMasterController::class, 'show'])->defaults('master', 'qualifications');
-        Route::match(['put', 'patch'], '/{identifier}', [ReferenceMasterController::class, 'update'])->defaults('master', 'qualifications');
-        Route::delete('/{identifier}', [ReferenceMasterController::class, 'destroy'])->defaults('master', 'qualifications');
-        Route::post('/{identifier}/restore', [ReferenceMasterController::class, 'restore'])->defaults('master', 'qualifications');
-        Route::delete('/{identifier}/force', [ReferenceMasterController::class, 'forceDelete'])->defaults('master', 'qualifications');
+    Route::prefix('notifications')->group(function () {
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::get('/drawer', [NotificationController::class, 'drawer']);
+        Route::post('/read-all', [NotificationController::class, 'markAllRead']);
+        Route::post('/{id}/read', [NotificationController::class, 'markRead']);
     });
 
     Route::get('/role/sidebar-menus', [RolePrivilegeController::class, 'sidebarMenusForRole']);
+});
+
+Route::prefix('attendance')->middleware('checkAuth')->group(function () {
+    Route::middleware('role:admin,hr')->prefix('admin')->group(function () {
+        Route::get('/company', [AttendanceSetupController::class, 'showCompany']);
+        Route::patch('/company', [AttendanceSetupController::class, 'updateCompany']);
+        Route::get('/request-ip', [AttendanceSetupController::class, 'requestIp']);
+
+        Route::get('/branches/{branchId}/networks', [AttendanceSetupController::class, 'indexBranchNetworks']);
+        Route::post('/branches/{branchId}/networks', [AttendanceSetupController::class, 'storeBranchNetwork']);
+        Route::match(['put', 'patch'], '/branches/{branchId}/networks/{networkId}', [AttendanceSetupController::class, 'updateBranchNetwork']);
+        Route::delete('/branches/{branchId}/networks/{networkId}', [AttendanceSetupController::class, 'destroyBranchNetwork']);
+
+        Route::get('/branches/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'branches');
+        Route::match(['put', 'patch'], '/branches/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'branches');
+        Route::delete('/branches/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'branches');
+
+        Route::get('/departments/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'departments');
+        Route::match(['put', 'patch'], '/departments/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'departments');
+        Route::delete('/departments/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'departments');
+
+        Route::get('/designations/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'designations');
+        Route::match(['put', 'patch'], '/designations/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'designations');
+        Route::delete('/designations/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'designations');
+
+        Route::get('/shifts/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'shifts');
+        Route::match(['put', 'patch'], '/shifts/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'shifts');
+        Route::delete('/shifts/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'shifts');
+
+        Route::get('/attendance-policies/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'attendance-policies');
+        Route::match(['put', 'patch'], '/attendance-policies/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'attendance-policies');
+        Route::delete('/attendance-policies/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'attendance-policies');
+
+        Route::get('/holidays/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'holidays');
+        Route::match(['put', 'patch'], '/holidays/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'holidays');
+        Route::delete('/holidays/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'holidays');
+
+        Route::get('/leave-types/{id}', [AttendanceSetupController::class, 'show'])
+            ->defaults('resource', 'leave-types');
+        Route::match(['put', 'patch'], '/leave-types/{id}', [AttendanceSetupController::class, 'update'])
+            ->defaults('resource', 'leave-types');
+        Route::delete('/leave-types/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->defaults('resource', 'leave-types');
+
+        Route::get('/{resource}', [AttendanceSetupController::class, 'index'])
+            ->where('resource', 'departments|designations|branches|shifts|attendance-policies|holidays|leave-types');
+        Route::post('/{resource}', [AttendanceSetupController::class, 'store'])
+            ->where('resource', 'departments|designations|branches|shifts|attendance-policies|holidays|leave-types');
+        Route::get('/{resource}/{id}', [AttendanceSetupController::class, 'show'])
+            ->where('resource', 'departments|designations|branches|shifts|attendance-policies|holidays|leave-types');
+        Route::match(['put', 'patch'], '/{resource}/{id}', [AttendanceSetupController::class, 'update'])
+            ->where('resource', 'departments|designations|branches|shifts|attendance-policies|holidays|leave-types');
+        Route::delete('/{resource}/{id}', [AttendanceSetupController::class, 'destroy'])
+            ->where('resource', 'departments|designations|branches|shifts|attendance-policies|holidays|leave-types');
+    });
+
+    Route::middleware('role:admin,hr')->prefix('hr')->group(function () {
+        Route::get('/employees', [AttendanceEmployeeController::class, 'index']);
+        Route::post('/employees', [AttendanceEmployeeController::class, 'store']);
+        Route::get('/employees/{id}', [AttendanceEmployeeController::class, 'show']);
+        Route::match(['put', 'patch'], '/employees/{id}', [AttendanceEmployeeController::class, 'update']);
+        Route::post('/employees/{id}/devices', [AttendanceEmployeeController::class, 'registerDevice']);
+        Route::get('/employees/{id}/attendance-history', [AttendanceEmployeeController::class, 'attendanceHistory']);
+
+        Route::get('/dashboard', [AttendanceOperationsController::class, 'dashboard']);
+        Route::get('/live-attendance', [AttendanceOperationsController::class, 'liveAttendance']);
+        Route::get('/attendance', [AttendanceOperationsController::class, 'attendanceIndex']);
+        Route::get('/pending-approvals', [AttendanceOperationsController::class, 'pendingApprovals']);
+        Route::post('/approvals/{id}/decision', [AttendanceOperationsController::class, 'decideApproval']);
+        Route::post('/attendance/{attendanceId}/manual-correction', [AttendanceOperationsController::class, 'manualCorrection']);
+        Route::get('/reports', [AttendanceOperationsController::class, 'reports']);
+        Route::get('/offline-sync-logs', [AttendanceOperationsController::class, 'offlineSyncLogs']);
+        Route::get('/location-exceptions', [AttendanceOperationsController::class, 'locationExceptions']);
+        Route::get('/leaves', [AttendanceOperationsController::class, 'leaveIndex']);
+        Route::post('/leaves/{leaveId}/decision', [AttendanceOperationsController::class, 'decideLeave']);
+    });
+
+    Route::middleware('role:employee')->prefix('mobile')->group(function () {
+        Route::get('/bootstrap', [AttendanceMobileController::class, 'bootstrap']);
+        Route::get('/request-ip', [AttendanceMobileController::class, 'requestIp']);
+        Route::get('/active-session', [AttendanceMobileController::class, 'activeSession']);
+        Route::get('/history', [AttendanceMobileController::class, 'history']);
+        Route::post('/punch', [AttendanceMobileController::class, 'punch']);
+        Route::post('/sync', [AttendanceMobileController::class, 'sync']);
+        Route::post('/location-ping', [AttendanceMobileController::class, 'locationPing']);
+        Route::get('/sync-queue', [AttendanceMobileController::class, 'syncQueue']);
+        Route::get('/leaves', [AttendanceMobileController::class, 'myLeaves']);
+        Route::post('/leaves', [AttendanceMobileController::class, 'applyLeave']);
+        Route::get('/summary', [AttendanceMobileController::class, 'summary']);
+    });
 });

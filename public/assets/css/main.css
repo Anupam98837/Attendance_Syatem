@@ -1,8 +1,8 @@
 /* =========================================================
-   LegMed UI — main.css v2.0
-   Professional · Animated · Fully Responsive
-   Bootstrap 5 polish · Accessible · Dark-mode via .theme-dark
-   Fonts: Inter (UI) · Poppins (headings)
+   LegMed UI â€” main.css v2.0
+   Professional Â· Animated Â· Fully Responsive
+   Bootstrap 5 polish Â· Accessible Â· Dark-mode via .theme-dark
+   Fonts: Inter (UI) Â· Poppins (headings)
    ========================================================= */
 
 /* ---- Fonts ---- */
@@ -447,7 +447,7 @@ img { max-width: 100%; display: block; }
 .form-switch .form-check-input:checked::before { left: calc(100% - 1rem - 3px); }
 
 /* =========================================================
-   Tables — Fully Responsive
+   Tables â€” Fully Responsive
    ========================================================= */
 .table,
 .table-striped,
@@ -1040,10 +1040,10 @@ html.theme-dark ::-webkit-scrollbar-thumb  { background: #475569 !important; bor
 html.theme-dark ::-webkit-scrollbar-thumb:hover { background: #64748b !important; }
 
 /* =========================================================
-   Dashboard Module — Global Enhancements
+   Dashboard Module â€” Global Enhancements
    ========================================================= */
 
-/* Page-level entrance — targets all module wrap classes */
+/* Page-level entrance â€” targets all module wrap classes */
 .panel > section,
 .bdash-wrap,
 .abk-wrap,

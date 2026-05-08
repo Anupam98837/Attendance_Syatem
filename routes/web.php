@@ -1,19 +1,15 @@
 <?php
 
-use App\Http\Controllers\PublicDirectoryController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [PublicDirectoryController::class, 'home'])->name('directory.home');
-Route::get('/login', fn () => view('pages.auth.login'))->name('login');
-Route::get('/register', fn () => view('pages.auth.register'))->name('register');
-Route::get('/find-doctors/departments', [PublicDirectoryController::class, 'departments'])->name('directory.departments.index');
-Route::get('/find-doctors/departments/{slug}', [PublicDirectoryController::class, 'departmentShow'])->name('directory.departments.show');
-Route::get('/doctor/{slug}', [PublicDirectoryController::class, 'doctorShow'])->name('directory.doctors.show');
+Route::view('/', 'pages.auth.login')->name('login');
+Route::redirect('/login', '/');
+Route::redirect('/register', '/');
+Route::redirect('/forgot-password', '/');
+Route::redirect('/reset-password', '/');
 
-Route::view('/dashboard', 'pages.pages.common.dashboard');
+Route::view('/dashboard', 'modules.attendance.employee.employeeDashboard');
 Route::view('/profile', 'pages.pages.user.profile');
-Route::view('/my-bookings', 'pages.pages.bookings.myBookings');
-Route::view('/bookings/manage', 'pages.pages.bookings.manageBookings');
 Route::redirect('/user', '/users/manage');
 
 Route::view('/users/manage', 'pages.pages.users.manageUsers');
@@ -27,15 +23,42 @@ Route::view('/page-privilege/create', 'modules.privileges.createPagePrivileges')
 
 Route::view('/user-privileges/manage', 'modules.privileges.assignPrivileges');
 Route::view('/role-privileges/manage', 'modules.privileges.assignRolePrivileges');
-Route::view('/departments', 'pages.pages.departments.manageDepartments');
-Route::view('/departments/create', 'pages.pages.departments.manageDepartments');
-Route::view('/clinics/manage', 'pages.pages.clinics.manageClinics');
-Route::view('/hospital/create', 'pages.pages.hospitals.createHospital');
-Route::view('/hospital/manage', 'pages.pages.hospitals.manageHospitals');
-Route::view('/doctor/profile/{userUuid}', 'pages.pages.doctors.profileDoctor');
-Route::view('/specializations/manage', 'pages.pages.specializations.manageSpecializations');
-Route::view('/designations/manage', 'pages.pages.designations.manageDesignations');
-Route::view('/registration-councils/manage', 'pages.pages.registrationCouncils.manageRegistrationCouncils');
-Route::view('/languages/manage', 'pages.pages.languages.manageLanguages');
-Route::view('/services/manage', 'pages.pages.services.manageServices');
-Route::view('/qualifications/manage', 'pages.pages.qualifications.manageQualifications');
+
+Route::view('/attendance/company', 'modules.attendance.setup.manageCompanySettings');
+Route::view('/attendance/branches', 'modules.attendance.setup.manageBranches');
+Route::view('/attendance/branch-networks', 'modules.attendance.setup.manageBranchNetworks');
+Route::view('/attendance/departments', 'modules.attendance.setup.manageDepartments');
+Route::view('/attendance/designations', 'modules.attendance.setup.manageDesignations');
+Route::view('/attendance/shifts', 'modules.attendance.setup.manageShifts');
+Route::view('/attendance/policies', 'modules.attendance.setup.managePolicies');
+Route::view('/attendance/holidays', 'modules.attendance.setup.manageHolidays');
+Route::view('/attendance/leave-types', 'modules.attendance.setup.manageLeaveTypes');
+Route::view('/attendance/employees', 'modules.attendance.workforce.manageEmployees');
+Route::view('/attendance/records', 'modules.attendance.operations.manageAttendanceRegister');
+Route::view('/attendance/today', 'modules.attendance.operations.manageTodayAttendance');
+Route::view('/attendance/monthly', 'modules.attendance.operations.manageMonthlyAttendance');
+Route::view('/attendance/pending-approvals', 'modules.attendance.operations.managePendingApprovals');
+Route::view('/attendance/reports', 'modules.attendance.operations.manageReports');
+Route::view('/attendance/offline-sync-logs', 'modules.attendance.operations.manageOfflineSyncLogs');
+Route::view('/attendance/location-exceptions', 'modules.attendance.operations.manageLocationExceptions');
+Route::view('/attendance/leaves', 'modules.attendance.operations.manageLeaves');
+Route::view('/attendance/employee-mobile', 'modules.attendance.employee.manageEmployeeAppBlueprint');
+Route::redirect('/attendance/employee-dashboard', '/dashboard');
+Route::view('/attendance/employee-history',   'modules.attendance.employee.employeeAttendanceHistory');
+Route::view('/attendance/employee-leaves',    'modules.attendance.employee.employeeLeaves');
+
+Route::get('/activity-logs', function () {
+    return view('pages.pages.common.placeholder', [
+        'pageTitle' => 'Activity Logs',
+        'pageLead' => 'User activity logging is preserved in the system and this screen is ready for the next attendance-specific implementation.',
+        'pageIcon' => 'fa-solid fa-clock-rotate-left',
+    ]);
+});
+
+Route::get('/notifications', function () {
+    return view('pages.pages.common.placeholder', [
+        'pageTitle' => 'Notifications',
+        'pageLead' => 'Notification delivery is active in the shared admin shell. A full notifications page can be added on top of this starter.',
+        'pageIcon' => 'fa-solid fa-bell',
+    ]);
+});
