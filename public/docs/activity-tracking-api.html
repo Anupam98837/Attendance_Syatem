@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Tracking API — Developer Reference</title>
+<style>
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #222536; --surface3: #2a2f45;
+    --border: rgba(255,255,255,.08); --border2: rgba(255,255,255,.14);
+    --ink: #e8eaf6; --muted: #8b92b8; --accent: #6c63ff;
+    --green: #22c55e; --blue: #38bdf8; --amber: #fbbf24; --red: #f87171;
+    --purple: #a78bfa; --teal: #2dd4bf;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font); line-height: 1.7; }
+
+  /* ── layout ── */
+  .layout { display: grid; grid-template-columns: 270px 1fr; min-height: 100vh; }
+  @media(max-width:900px){ .layout { grid-template-columns:1fr; } .sidebar { display:none; } }
+
+  /* ── sidebar ── */
+  .sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    padding: 30px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .sidebar-logo {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 28px;
+    font-size: 15px; font-weight: 800; color: var(--ink);
+  }
+  .sidebar-logo-icon {
+    width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, var(--accent), #38bdf8); font-size: 16px;
+  }
+  .nav-section { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin: 20px 0 8px; }
+  .nav-link {
+    display: block; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500;
+    color: var(--muted); text-decoration: none; transition: all .15s; margin-bottom: 2px;
+  }
+  .nav-link:hover, .nav-link.active { background: rgba(108,99,255,.15); color: var(--ink); }
+
+  /* ── main ── */
+  .main { padding: 48px 56px 80px; max-width: 920px; }
+  @media(max-width:700px){ .main { padding: 24px 20px 60px; } }
+
+  /* ── hero ── */
+  .hero { margin-bottom: 52px; }
+  .hero-kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(108,99,255,.15); border: 1px solid rgba(108,99,255,.3);
+    color: var(--purple); padding: 6px 14px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    margin-bottom: 18px;
+  }
+  .hero h1 { font-size: clamp(1.8rem, 3.5vw, 2.8rem); letter-spacing: -.04em; line-height: 1.15; }
+  .hero h1 span { color: var(--accent); }
+  .hero p { margin-top: 14px; color: var(--muted); max-width: 58ch; font-size: 16px; }
+  .version-row { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+    border: 1px solid;
+  }
+  .badge-green  { background: rgba(34,197,94,.1);  color: var(--green);  border-color: rgba(34,197,94,.25); }
+  .badge-blue   { background: rgba(56,189,248,.1);  color: var(--blue);   border-color: rgba(56,189,248,.25); }
+  .badge-amber  { background: rgba(251,191,36,.1);  color: var(--amber);  border-color: rgba(251,191,36,.25); }
+  .badge-purple { background: rgba(167,139,250,.1); color: var(--purple); border-color: rgba(167,139,250,.25); }
+
+  /* ── section ── */
+  .section { margin-bottom: 60px; }
+  h2 { font-size: 1.5rem; letter-spacing: -.03em; margin-bottom: 6px; }
+  h2 .section-icon { color: var(--accent); margin-right: 8px; }
+  .section-lead { color: var(--muted); font-size: 14px; margin-bottom: 24px; max-width: 60ch; }
+  h3 { font-size: 1rem; font-weight: 700; margin: 28px 0 10px; color: var(--blue); }
+  h4 { font-size: .875rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 20px 0 8px; }
+
+  /* ── endpoint card ── */
+  .endpoint {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden; margin-bottom: 20px;
+  }
+  .endpoint-head {
+    display: flex; align-items: center; gap: 12px; padding: 16px 20px;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px;
+  }
+  .method {
+    padding: 4px 12px; border-radius: 7px; font-size: 12px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .06em; font-family: var(--mono);
+  }
+  .method-post   { background: rgba(34,197,94,.15);  color: var(--green); }
+  .method-get    { background: rgba(56,189,248,.15);  color: var(--blue); }
+  .method-patch  { background: rgba(251,191,36,.15);  color: var(--amber); }
+  .ep-path { font-family: var(--mono); font-size: 14px; color: var(--ink); flex: 1; }
+  .ep-auth {
+    font-size: 11px; padding: 3px 10px; border-radius: 6px; font-weight: 700;
+    background: rgba(167,139,250,.12); color: var(--purple); border: 1px solid rgba(167,139,250,.2);
+  }
+  .endpoint-body { padding: 20px; }
+  .endpoint-desc { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+
+  /* ── table ── */
+  .field-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .field-table th {
+    background: var(--surface2); text-align: left; padding: 9px 12px;
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--muted); border-bottom: 1px solid var(--border2);
+  }
+  .field-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .field-table tr:last-child td { border-bottom: none; }
+  .field-name { font-family: var(--mono); color: var(--teal); font-size: 12px; }
+  .field-type { font-family: var(--mono); color: var(--amber); font-size: 11px; }
+  .field-req  { color: var(--red); font-weight: 700; font-size: 11px; }
+  .field-opt  { color: var(--muted); font-size: 11px; }
+  .field-desc { color: var(--muted); font-size: 12px; line-height: 1.6; }
+
+  /* ── code block ── */
+  pre {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; overflow-x: auto; font-family: var(--mono); font-size: 13px;
+    line-height: 1.65; margin: 12px 0;
+  }
+  code { font-family: var(--mono); font-size: .9em; color: var(--teal); background: rgba(45,212,191,.1); padding: 1px 5px; border-radius: 4px; }
+
+  /* ── alert ── */
+  .alert {
+    padding: 14px 18px; border-radius: 12px; font-size: 13px; margin: 16px 0; line-height: 1.6;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .alert-info   { background: rgba(56,189,248,.08);  border: 1px solid rgba(56,189,248,.2);  color: var(--blue); }
+  .alert-warn   { background: rgba(251,191,36,.08);  border: 1px solid rgba(251,191,36,.2);  color: var(--amber); }
+  .alert-green  { background: rgba(34,197,94,.08);   border: 1px solid rgba(34,197,94,.2);   color: var(--green); }
+  .alert-icon   { font-size: 15px; margin-top: 1px; flex-shrink: 0; }
+
+  /* ── step ── */
+  .steps { counter-reset: step; display: grid; gap: 16px; margin: 16px 0; }
+  .step {
+    display: flex; gap: 16px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px;
+  }
+  .step-num {
+    counter-increment: step;
+    width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+  }
+  .step-num::before { content: counter(step); }
+  .step-body h4 { margin: 0 0 6px; font-size: 14px; color: var(--ink); text-transform: none; letter-spacing: 0; }
+  .step-body p  { margin: 0; font-size: 13px; color: var(--muted); }
+
+  /* ── divider ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+
+  /* ── syntax highlighting mimic ── */
+  .kw { color: #c792ea; }
+  .str { color: #c3e88d; }
+  .num { color: #f78c6c; }
+  .cmt { color: #546e7a; font-style: italic; }
+  .key { color: var(--blue); }
+  .brace { color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <nav class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">📡</div>
+      Activity Tracking API
+    </div>
+    <div class="nav-section">Overview</div>
+    <a href="#overview" class="nav-link">Introduction</a>
+    <a href="#auth" class="nav-link">Authentication</a>
+    <a href="#base-url" class="nav-link">Base URL</a>
+
+    <div class="nav-section">API Endpoints</div>
+    <a href="#ep-log" class="nav-link">POST activity-log</a>
+    <a href="#ep-get" class="nav-link">GET activity-log</a>
+    <a href="#ep-list" class="nav-link">GET activity-logs (HR)</a>
+    <a href="#ep-detail" class="nav-link">GET activity-logs/{id}</a>
+
+    <div class="nav-section">Data Formats</div>
+    <a href="#gps-path" class="nav-link">GPS Path Format</a>
+    <a href="#wifi-networks" class="nav-link">WiFi Networks Format</a>
+    <a href="#raw-events" class="nav-link">Raw Event Stream</a>
+
+    <div class="nav-section">App Integration</div>
+    <a href="#bg-tracking" class="nav-link">Background Tracking</a>
+    <a href="#local-db" class="nav-link">Local Database Schema</a>
+    <a href="#sync-flow" class="nav-link">Sync Flow</a>
+    <a href="#android" class="nav-link">Android Guide</a>
+    <a href="#ios" class="nav-link">iOS Guide</a>
+    <a href="#browser" class="nav-link">Browser Guide</a>
+  </nav>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <main class="main">
+
+    <!-- ── HERO ── -->
+    <div class="hero" id="overview">
+      <div class="hero-kicker">📡 Developer Reference v1.0</div>
+      <h1>Activity Tracking <span>API</span></h1>
+      <p>Complete reference for the employee activity tracking endpoints — GPS traversal, WiFi events, office presence, movement detection, and app state — with app integration guides for Android, iOS, and Browser.</p>
+      <div class="version-row">
+        <span class="badge badge-green">✓ REST JSON API</span>
+        <span class="badge badge-blue">Bearer Token Auth</span>
+        <span class="badge badge-amber">Background Tracking</span>
+        <span class="badge badge-purple">Offline-first</span>
+      </div>
+    </div>
+
+    <!-- ── AUTH ── -->
+    <div class="section" id="auth">
+      <h2><span class="section-icon">🔐</span>Authentication</h2>
+      <p class="section-lead">All endpoints require a Bearer token in the <code>Authorization</code> header.</p>
+      <pre><span class="cmt"># Every request must include:</span>
+Authorization: Bearer &lt;your_jwt_token&gt;
+Accept: application/json</pre>
+      <div class="alert alert-info">
+        <span class="alert-icon">ℹ️</span>
+        <span>The token is obtained from <code>POST /api/auth/login</code> and stored in the app's secure storage. Employee tokens have access to the <code>/mobile</code> endpoints. HR/Admin tokens access the <code>/hr</code> endpoints.</span>
+      </div>
+    </div>
+
+    <!-- ── BASE URL ── -->
+    <div class="section" id="base-url">
+      <h2><span class="section-icon">🌐</span>Base URL</h2>
+      <pre><span class="str">/api/attendance</span>
+
+<span class="cmt"># Employee endpoints  →  /api/attendance/mobile/activity-log</span>
+<span class="cmt"># HR/Admin endpoints  →  /api/attendance/hr/activity-logs</span></pre>
+    </div>
+
+    <hr>
+
+    <!-- ═══════════════ ENDPOINTS ═══════════════ -->
+    <div class="section" id="ep-log">
+      <h2><span class="section-icon">📤</span>POST — Submit Activity Log</h2>
+      <p class="section-lead">Submit or update the daily activity log for the authenticated employee. Safe to call multiple times — it upserts on <code>(user_id, attendance_date)</code>, so the latest payload always wins.</p>
+
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method method-post">POST</span>
+          <span class="ep-path">/api/attendance/mobile/activity-log</span>
+          <span class="ep-auth">role: employee</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Upserts the activity log for the given date. Send this after checkout, periodically during the day, or when the app comes back online after offline usage.</p>
+
+          <h4>Request Body (JSON)</h4>
+          <table class="field-table">
+            <thead><tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="field-name">attendance_date</td><td class="field-type">string (date)</td><td class="field-opt">Optional</td><td class="field-desc">YYYY-MM-DD. Defaults to today's server date if omitted.</td></tr>
+              <tr><td class="field-name">session_start</td><td class="field-type">string (ISO 8601)</td><td class="field-opt">Optional</td><td class="field-desc">Timestamp of the first tracking event of the day.</td></tr>
+              <tr><td class="field-name">session_end</td><td class="field-type">string (ISO 8601)</td><td class="field-opt">Optional</td><td class="field-desc">Timestamp of the last tracking event.</td></tr>
+              <tr><td class="field-name">platform</td><td class="field-type">string</td><td class="field-opt">Optional</td><td class="field-desc"><code>android</code> | <code>ios</code> | <code>web</code></td></tr>
+              <tr><td class="field-name">app_version</td><td class="field-type">string</td><td class="field-opt">Optional</td><td class="field-desc">App version string, e.g. <code>"1.4.2"</code></td></tr>
+              <tr><td class="field-name">device_id</td><td class="field-type">string</td><td class="field-opt">Optional</td><td class="field-desc">Unique device identifier.</td></tr>
+              <tr><td colspan="4" style="background:rgba(56,189,248,.04);padding:8px 12px;font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.06em;">GPS Fields</td></tr>
+              <tr><td class="field-name">gps_connect_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times GPS was turned ON during the day.</td></tr>
+              <tr><td class="field-name">gps_disconnect_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times GPS was turned OFF.</td></tr>
+              <tr><td class="field-name">gps_path</td><td class="field-type">array</td><td class="field-opt">Optional</td><td class="field-desc">Array of GPS waypoint objects. See <a href="#gps-path" style="color:var(--blue);">GPS Path Format</a>.</td></tr>
+              <tr><td class="field-name">total_distance_meters</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total distance traveled in meters (sum of consecutive waypoint distances).</td></tr>
+              <tr><td class="field-name">is_traveling</td><td class="field-type">boolean</td><td class="field-opt">Optional</td><td class="field-desc"><code>true</code> if the employee traveled more than 500m from the office during the day.</td></tr>
+              <tr><td class="field-name">time_traveling_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total minutes spent moving (speed > 5 km/h or significant distance from last point).</td></tr>
+              <tr><td class="field-name">time_stationary_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total minutes with no meaningful movement.</td></tr>
+              <tr><td class="field-name">max_speed_kmh</td><td class="field-type">decimal</td><td class="field-opt">Optional</td><td class="field-desc">Highest recorded speed in km/h.</td></tr>
+              <tr><td class="field-name">avg_speed_kmh</td><td class="field-type">decimal</td><td class="field-opt">Optional</td><td class="field-desc">Average moving speed in km/h (when moving only).</td></tr>
+              <tr><td class="field-name">furthest_distance_from_office_meters</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Maximum distance from the office location in meters at any point during the day.</td></tr>
+              <tr><td colspan="4" style="background:rgba(56,189,248,.04);padding:8px 12px;font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.06em;">WiFi Fields</td></tr>
+              <tr><td class="field-name">wifi_connect_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times the device connected to any WiFi network.</td></tr>
+              <tr><td class="field-name">wifi_disconnect_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times WiFi was disconnected.</td></tr>
+              <tr><td class="field-name">wifi_switch_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times the active SSID changed (excludes reconnect to same network).</td></tr>
+              <tr><td class="field-name">wifi_networks_seen</td><td class="field-type">array</td><td class="field-opt">Optional</td><td class="field-desc">Array of WiFi network objects. See <a href="#wifi-networks" style="color:var(--blue);">WiFi Networks Format</a>.</td></tr>
+              <tr><td colspan="4" style="background:rgba(56,189,248,.04);padding:8px 12px;font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Office / Geofence Fields</td></tr>
+              <tr><td class="field-name">office_entry_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times employee entered the office geofence.</td></tr>
+              <tr><td class="field-name">office_exit_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times employee exited the office geofence.</td></tr>
+              <tr><td class="field-name">time_inside_office_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total minutes spent inside the office geofence radius.</td></tr>
+              <tr><td class="field-name">time_outside_office_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total minutes spent outside the office geofence.</td></tr>
+              <tr><td colspan="4" style="background:rgba(56,189,248,.04);padding:8px 12px;font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Movement & App Fields</td></tr>
+              <tr><td class="field-name">movement_event_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total number of detected position-change events (&gt;5m displacement).</td></tr>
+              <tr><td class="field-name">idle_streak_max_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Longest continuous idle period in minutes (no movement detected).</td></tr>
+              <tr><td class="field-name">app_foreground_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times the app came to the foreground.</td></tr>
+              <tr><td class="field-name">app_background_count</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Number of times the app went to the background.</td></tr>
+              <tr><td class="field-name">app_foreground_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total minutes app was in foreground.</td></tr>
+              <tr><td class="field-name">app_background_minutes</td><td class="field-type">integer</td><td class="field-opt">Optional</td><td class="field-desc">Total minutes app ran in background.</td></tr>
+              <tr><td colspan="4" style="background:rgba(56,189,248,.04);padding:8px 12px;font-size:11px;color:var(--blue);font-weight:700;text-transform:uppercase;letter-spacing:.06em;">Battery & Meta</td></tr>
+              <tr><td class="field-name">battery_start_percent</td><td class="field-type">integer (0–100)</td><td class="field-opt">Optional</td><td class="field-desc">Battery level at session start.</td></tr>
+              <tr><td class="field-name">battery_end_percent</td><td class="field-type">integer (0–100)</td><td class="field-opt">Optional</td><td class="field-desc">Battery level at session end / last sync.</td></tr>
+              <tr><td class="field-name">client_created_at</td><td class="field-type">string (ISO 8601)</td><td class="field-opt">Optional</td><td class="field-desc">When the local record was first created on the device.</td></tr>
+              <tr><td class="field-name">raw_events</td><td class="field-type">array</td><td class="field-opt">Optional</td><td class="field-desc">Raw event stream. See <a href="#raw-events" style="color:var(--blue);">Raw Event Stream</a>. Max 500 events stored.</td></tr>
+              <tr><td class="field-name">metadata</td><td class="field-type">object</td><td class="field-opt">Optional</td><td class="field-desc">Any extra platform-specific data as key-value pairs.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Success Response</h4>
+<pre>{
+  <span class="key">"status"</span>: <span class="str">"success"</span>,
+  <span class="key">"message"</span>: <span class="str">"Activity log saved."</span>,
+  <span class="key">"data"</span>: <span class="brace">{</span>
+    <span class="key">"id"</span>: <span class="num">42</span>,
+    <span class="key">"attendance_date"</span>: <span class="str">"2026-05-09"</span>
+  <span class="brace">}</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── GET MY LOG ── -->
+    <div class="section" id="ep-get">
+      <h2><span class="section-icon">📥</span>GET — My Activity Log</h2>
+      <p class="section-lead">Fetch the authenticated employee's own activity log for a specific date.</p>
+
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/api/attendance/mobile/activity-log?date=YYYY-MM-DD</span>
+          <span class="ep-auth">role: employee</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns the full activity log for the given date. <code>data</code> is <code>null</code> if no log exists yet.</p>
+          <h4>Query Parameters</h4>
+          <table class="field-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Required</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="field-name">date</td><td class="field-type">string (date)</td><td class="field-opt">Optional</td><td class="field-desc">YYYY-MM-DD. Defaults to today.</td></tr>
+            </tbody>
+          </table>
+          <h4>Success Response</h4>
+<pre>{
+  <span class="key">"status"</span>: <span class="str">"success"</span>,
+  <span class="key">"data"</span>: <span class="brace">{</span>
+    <span class="key">"id"</span>: <span class="num">42</span>, <span class="key">"uuid"</span>: <span class="str">"..."</span>,
+    <span class="key">"attendance_date"</span>: <span class="str">"2026-05-09"</span>,
+    <span class="key">"gps_path"</span>: <span class="brace">[</span> <span class="cmt">/* waypoints */</span> <span class="brace">]</span>,
+    <span class="key">"wifi_networks_seen"</span>: <span class="brace">[</span> <span class="cmt">/* networks */</span> <span class="brace">]</span>,
+    <span class="cmt">// ... all other fields</span>
+  <span class="brace">}</span>
+}</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LIST ── -->
+    <div class="section" id="ep-list">
+      <h2><span class="section-icon">📋</span>GET — List Activity Logs (HR)</h2>
+      <p class="section-lead">Paginated list of all employees' activity logs. Available to HR and Admin roles.</p>
+
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/api/attendance/hr/activity-logs</span>
+          <span class="ep-auth">role: admin | hr</span>
+        </div>
+        <div class="endpoint-body">
+          <h4>Query Parameters</h4>
+          <table class="field-table">
+            <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+            <tbody>
+              <tr><td class="field-name">date</td><td class="field-type">string</td><td class="field-desc">Filter by exact date.</td></tr>
+              <tr><td class="field-name">from</td><td class="field-type">string</td><td class="field-desc">Start of date range (inclusive).</td></tr>
+              <tr><td class="field-name">to</td><td class="field-type">string</td><td class="field-desc">End of date range (inclusive).</td></tr>
+              <tr><td class="field-name">user_id</td><td class="field-type">integer</td><td class="field-desc">Filter by specific employee.</td></tr>
+              <tr><td class="field-name">search</td><td class="field-type">string</td><td class="field-desc">Partial match on employee name or code.</td></tr>
+              <tr><td class="field-name">per_page</td><td class="field-type">integer</td><td class="field-desc">Records per page (max 100). Default: 25.</td></tr>
+              <tr><td class="field-name">page</td><td class="field-type">integer</td><td class="field-desc">Page number. Default: 1.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DETAIL ── -->
+    <div class="section" id="ep-detail">
+      <h2><span class="section-icon">🔍</span>GET — Activity Log Detail (HR)</h2>
+      <div class="endpoint">
+        <div class="endpoint-head">
+          <span class="method method-get">GET</span>
+          <span class="ep-path">/api/attendance/hr/activity-logs/{id}</span>
+          <span class="ep-auth">role: admin | hr</span>
+        </div>
+        <div class="endpoint-body">
+          <p class="endpoint-desc">Returns the full activity log including GPS path array, WiFi networks, raw event stream, and linked attendance record data.</p>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- ═══════════════ DATA FORMATS ═══════════════ -->
+    <div class="section" id="gps-path">
+      <h2><span class="section-icon">📍</span>GPS Path Format</h2>
+      <p class="section-lead">The <code>gps_path</code> field is an array of waypoint objects. Collect a new waypoint whenever the device moves more than 5–10 meters or every 30–60 seconds while moving.</p>
+
+      <h4>Waypoint Object</h4>
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">lat</td><td class="field-type">float</td><td class="field-desc">Latitude in decimal degrees (e.g. <code>12.97161</code>).</td></tr>
+          <tr><td class="field-name">lng</td><td class="field-type">float</td><td class="field-desc">Longitude in decimal degrees (e.g. <code>77.59461</code>).</td></tr>
+          <tr><td class="field-name">acc</td><td class="field-type">integer</td><td class="field-desc">Horizontal accuracy in meters (±).</td></tr>
+          <tr><td class="field-name">ts</td><td class="field-type">string (ISO 8601)</td><td class="field-desc">UTC timestamp of the GPS fix.</td></tr>
+          <tr><td class="field-name">spd_kmh</td><td class="field-type">float</td><td class="field-desc">Speed at this point in km/h. Use <code>0</code> or omit if stationary.</td></tr>
+          <tr><td class="field-name">alt</td><td class="field-type">float</td><td class="field-desc">Altitude in meters (optional).</td></tr>
+          <tr><td class="field-name">is_moving</td><td class="field-type">boolean</td><td class="field-desc"><code>true</code> if the device was moving at this point.</td></tr>
+        </tbody>
+      </table>
+
+      <h4>Example</h4>
+<pre><span class="key">"gps_path"</span>: <span class="brace">[</span>
+  <span class="brace">{</span>
+    <span class="key">"lat"</span>: <span class="num">12.97161</span>, <span class="key">"lng"</span>: <span class="num">77.59461</span>,
+    <span class="key">"acc"</span>: <span class="num">5</span>, <span class="key">"ts"</span>: <span class="str">"2026-05-09T09:02:15Z"</span>,
+    <span class="key">"spd_kmh"</span>: <span class="num">0.0</span>, <span class="key">"alt"</span>: <span class="num">920.5</span>, <span class="key">"is_moving"</span>: <span class="kw">false</span>
+  <span class="brace">}</span>,
+  <span class="brace">{</span>
+    <span class="key">"lat"</span>: <span class="num">12.97249</span>, <span class="key">"lng"</span>: <span class="num">77.59512</span>,
+    <span class="key">"acc"</span>: <span class="num">8</span>, <span class="key">"ts"</span>: <span class="str">"2026-05-09T09:15:30Z"</span>,
+    <span class="key">"spd_kmh"</span>: <span class="num">4.2</span>, <span class="key">"alt"</span>: <span class="num">921.0</span>, <span class="key">"is_moving"</span>: <span class="kw">true</span>
+  <span class="brace">}</span>
+<span class="brace">]</span></pre>
+
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <span><strong>Limit path size:</strong> Cap at 500 waypoints per day before syncing. Use distance-based sampling (only add a point if the device moved &gt;10m) to keep the array small without losing path fidelity.</span>
+      </div>
+    </div>
+
+    <div class="section" id="wifi-networks">
+      <h2><span class="section-icon">📶</span>WiFi Networks Format</h2>
+      <p class="section-lead">The <code>wifi_networks_seen</code> field tracks each unique network connection during the day.</p>
+
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">ssid</td><td class="field-type">string</td><td class="field-desc">Network name (SSID).</td></tr>
+          <tr><td class="field-name">bssid</td><td class="field-type">string</td><td class="field-desc">MAC address of the access point (optional).</td></tr>
+          <tr><td class="field-name">connected_at</td><td class="field-type">string (ISO 8601)</td><td class="field-desc">When connection was established.</td></tr>
+          <tr><td class="field-name">disconnected_at</td><td class="field-type">string (ISO 8601)</td><td class="field-desc">When connection ended (null if still connected).</td></tr>
+          <tr><td class="field-name">duration_seconds</td><td class="field-type">integer</td><td class="field-desc">Connection duration in seconds.</td></tr>
+        </tbody>
+      </table>
+
+<pre><span class="key">"wifi_networks_seen"</span>: <span class="brace">[</span>
+  <span class="brace">{</span>
+    <span class="key">"ssid"</span>: <span class="str">"Office-Corp"</span>, <span class="key">"bssid"</span>: <span class="str">"aa:bb:cc:11:22:33"</span>,
+    <span class="key">"connected_at"</span>: <span class="str">"2026-05-09T09:00:00Z"</span>,
+    <span class="key">"disconnected_at"</span>: <span class="str">"2026-05-09T17:30:00Z"</span>,
+    <span class="key">"duration_seconds"</span>: <span class="num">30600</span>
+  <span class="brace">}</span>,
+  <span class="brace">{</span>
+    <span class="key">"ssid"</span>: <span class="str">"CoffeeShop-Guest"</span>,
+    <span class="key">"connected_at"</span>: <span class="str">"2026-05-09T13:05:00Z"</span>,
+    <span class="key">"disconnected_at"</span>: <span class="str">"2026-05-09T14:00:00Z"</span>,
+    <span class="key">"duration_seconds"</span>: <span class="num">3300</span>
+  <span class="brace">}</span>
+<span class="brace">]</span></pre>
+    </div>
+
+    <div class="section" id="raw-events">
+      <h2><span class="section-icon">📝</span>Raw Event Stream</h2>
+      <p class="section-lead">An ordered log of all significant tracking events. Stored for debugging — HR will never see this unless they access the raw API. Keep it trimmed to the last 500 events.</p>
+
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td class="field-name">type</td><td class="field-type">string</td><td class="field-desc"><code>gps</code> | <code>wifi</code> | <code>office</code> | <code>app</code> | <code>move</code> | <code>battery</code> | <code>other</code></td></tr>
+          <tr><td class="field-name">ts</td><td class="field-type">string (ISO 8601)</td><td class="field-desc">Event timestamp in UTC.</td></tr>
+          <tr><td class="field-name">msg</td><td class="field-type">string</td><td class="field-desc">Human-readable event description.</td></tr>
+          <tr><td class="field-name">payload</td><td class="field-type">object</td><td class="field-desc">Optional extra data for this event.</td></tr>
+        </tbody>
+      </table>
+
+<pre><span class="key">"raw_events"</span>: <span class="brace">[</span>
+  <span class="brace">{</span> <span class="key">"type"</span>: <span class="str">"gps"</span>,  <span class="key">"ts"</span>: <span class="str">"2026-05-09T09:00:01Z"</span>, <span class="key">"msg"</span>: <span class="str">"GPS connected"</span> <span class="brace">}</span>,
+  <span class="brace">{</span> <span class="key">"type"</span>: <span class="str">"wifi"</span>, <span class="key">"ts"</span>: <span class="str">"2026-05-09T09:00:05Z"</span>, <span class="key">"msg"</span>: <span class="str">"WiFi connected"</span>,
+    <span class="key">"payload"</span>: <span class="brace">{</span> <span class="key">"ssid"</span>: <span class="str">"Office-Corp"</span> <span class="brace">}</span> <span class="brace">}</span>,
+  <span class="brace">{</span> <span class="key">"type"</span>: <span class="str">"office"</span>, <span class="key">"ts"</span>: <span class="str">"2026-05-09T09:01:00Z"</span>, <span class="key">"msg"</span>: <span class="str">"Entered office geofence"</span> <span class="brace">}</span>,
+  <span class="brace">{</span> <span class="key">"type"</span>: <span class="str">"move"</span>, <span class="key">"ts"</span>: <span class="str">"2026-05-09T11:30:00Z"</span>, <span class="key">"msg"</span>: <span class="str">"Moved 42m"</span>,
+    <span class="key">"payload"</span>: <span class="brace">{</span> <span class="key">"dist_m"</span>: <span class="num">42</span>, <span class="key">"spd"</span>: <span class="str">"3.1"</span> <span class="brace">}</span> <span class="brace">}</span>,
+  <span class="brace">{</span> <span class="key">"type"</span>: <span class="str">"battery"</span>, <span class="key">"ts"</span>: <span class="str">"2026-05-09T17:00:00Z"</span>, <span class="key">"msg"</span>: <span class="str">"Battery low"</span>,
+    <span class="key">"payload"</span>: <span class="brace">{</span> <span class="key">"level"</span>: <span class="num">18</span> <span class="brace">}</span> <span class="brace">}</span>
+<span class="brace">]</span></pre>
+    </div>
+
+    <hr>
+
+    <!-- ═══════════════ APP INTEGRATION ═══════════════ -->
+    <div class="section" id="bg-tracking">
+      <h2><span class="section-icon">📱</span>Background Tracking Guide</h2>
+      <p class="section-lead">The app must track GPS, WiFi, and office presence even when the user locks their screen or switches to another app. Here's how to implement it correctly on each platform.</p>
+
+      <h3>Core Tracking Responsibilities</h3>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h4>Start tracking on check-in punch</h4>
+            <p>When the user checks in, start the GPS watcher, WiFi listener, and geofence monitor. Record <code>session_start</code> and <code>battery_start_percent</code>. Register a background service / WorkManager job.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h4>Collect events throughout the day</h4>
+            <p>Store all events in a local SQLite database (not memory). Include GPS waypoints on every significant movement (&gt;10m or every 60s while moving). Log WiFi SSID changes, geofence transitions, and battery checkpoints.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h4>Compute summary counters locally</h4>
+            <p>Maintain running counters for all integer fields (<code>gps_connect_count</code>, <code>wifi_switch_count</code>, etc.) in a single local record. Update them in real-time as events arrive.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h4>Sync on checkout OR every 15 minutes</h4>
+            <p>After checkout, assemble the full payload and <code>POST /api/attendance/mobile/activity-log</code>. Also schedule a periodic 15-minute sync during the day so data isn't lost if the app crashes.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num"></div>
+          <div class="step-body">
+            <h4>Stop tracking on checkout</h4>
+            <p>Remove the GPS watcher, unregister WiFi listeners, stop the background service. Record <code>session_end</code> and <code>battery_end_percent</code>. Do a final sync.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LOCAL DB ── -->
+    <div class="section" id="local-db">
+      <h2><span class="section-icon">🗄️</span>Local Database Schema</h2>
+      <p class="section-lead">Store data locally in SQLite before syncing. One row per work day per device.</p>
+<pre><span class="cmt">-- activity_log (one row per day)</span>
+<span class="kw">CREATE TABLE</span> activity_log <span class="brace">(</span>
+  id                            INTEGER PRIMARY KEY,
+  attendance_date               TEXT NOT NULL,          <span class="cmt">-- YYYY-MM-DD</span>
+  session_start                 TEXT,                   <span class="cmt">-- ISO 8601</span>
+  session_end                   TEXT,
+  gps_connect_count             INTEGER DEFAULT 0,
+  gps_disconnect_count          INTEGER DEFAULT 0,
+  total_distance_meters         INTEGER DEFAULT 0,
+  is_traveling                  INTEGER DEFAULT 0,      <span class="cmt">-- 0/1</span>
+  time_traveling_minutes        INTEGER DEFAULT 0,
+  time_stationary_minutes       INTEGER DEFAULT 0,
+  max_speed_kmh                 REAL,
+  furthest_distance_from_office INTEGER,
+  wifi_connect_count            INTEGER DEFAULT 0,
+  wifi_disconnect_count         INTEGER DEFAULT 0,
+  wifi_switch_count             INTEGER DEFAULT 0,
+  office_entry_count            INTEGER DEFAULT 0,
+  office_exit_count             INTEGER DEFAULT 0,
+  time_inside_office_minutes    INTEGER DEFAULT 0,
+  time_outside_office_minutes   INTEGER DEFAULT 0,
+  movement_event_count          INTEGER DEFAULT 0,
+  idle_streak_max_minutes       INTEGER DEFAULT 0,
+  app_foreground_count          INTEGER DEFAULT 0,
+  app_background_count          INTEGER DEFAULT 0,
+  app_foreground_minutes        INTEGER DEFAULT 0,
+  app_background_minutes        INTEGER DEFAULT 0,
+  battery_start_percent         INTEGER,
+  battery_end_percent           INTEGER,
+  synced_at                     TEXT,                   <span class="cmt">-- null if not yet synced</span>
+  created_at                    TEXT DEFAULT (datetime('now'))
+<span class="brace">)</span>;
+
+<span class="cmt">-- gps_waypoints (separate table, joined at sync time)</span>
+<span class="kw">CREATE TABLE</span> gps_waypoints <span class="brace">(</span>
+  id        INTEGER PRIMARY KEY,
+  log_date  TEXT NOT NULL,
+  lat       REAL, lng REAL, acc INTEGER,
+  ts        TEXT, spd_kmh REAL, alt REAL,
+  is_moving INTEGER DEFAULT 0
+<span class="brace">)</span>;
+
+<span class="cmt">-- wifi_events</span>
+<span class="kw">CREATE TABLE</span> wifi_events <span class="brace">(</span>
+  id               INTEGER PRIMARY KEY,
+  log_date         TEXT NOT NULL,
+  ssid             TEXT, bssid TEXT,
+  connected_at     TEXT, disconnected_at TEXT,
+  duration_seconds INTEGER
+<span class="brace">)</span>;
+
+<span class="cmt">-- raw_events (append-only, trimmed to last 500)</span>
+<span class="kw">CREATE TABLE</span> raw_events <span class="brace">(</span>
+  id       INTEGER PRIMARY KEY,
+  log_date TEXT NOT NULL,
+  type     TEXT, ts TEXT, msg TEXT, payload TEXT  <span class="cmt">-- payload as JSON string</span>
+<span class="brace">)</span>;</pre>
+    </div>
+
+    <!-- ── SYNC FLOW ── -->
+    <div class="section" id="sync-flow">
+      <h2><span class="section-icon">🔄</span>Sync Flow</h2>
+<pre><span class="cmt">// Pseudocode — works the same on Android, iOS, and Browser</span>
+
+<span class="kw">function</span> <span class="key">buildSyncPayload</span>(date) <span class="brace">{</span>
+  const log       = db.query(<span class="str">"SELECT * FROM activity_log WHERE attendance_date = ?"</span>, date);
+  const waypoints = db.query(<span class="str">"SELECT * FROM gps_waypoints WHERE log_date = ?"</span>, date);
+  const wifiNets  = db.query(<span class="str">"SELECT * FROM wifi_events WHERE log_date = ?"</span>, date);
+  const events    = db.query(<span class="str">"SELECT * FROM raw_events WHERE log_date = ? ORDER BY ts DESC LIMIT 500"</span>, date);
+
+  <span class="kw">return</span> <span class="brace">{</span>
+    ...log,
+    gps_path:           waypoints,
+    wifi_networks_seen: wifiNets,
+    raw_events:         events,
+    client_created_at:  log.created_at,
+  <span class="brace">}</span>;
+<span class="brace">}</span>
+
+<span class="kw">async function</span> <span class="key">syncToServer</span>(date) <span class="brace">{</span>
+  <span class="kw">if</span> (!isOnline()) <span class="kw">return</span>;          <span class="cmt">// retry when online</span>
+  const payload = buildSyncPayload(date);
+  const res = <span class="kw">await</span> fetch(<span class="str">"/api/attendance/mobile/activity-log"</span>, <span class="brace">{</span>
+    method: <span class="str">"POST"</span>,
+    headers: <span class="brace">{</span> <span class="str">"Authorization"</span>: <span class="str">"Bearer "</span> + token, <span class="str">"Content-Type"</span>: <span class="str">"application/json"</span> <span class="brace">}</span>,
+    body: JSON.stringify(payload)
+  <span class="brace">}</span>);
+  <span class="kw">if</span> (res.ok) db.run(<span class="str">"UPDATE activity_log SET synced_at = ? WHERE attendance_date = ?"</span>, now(), date);
+<span class="brace">}</span>
+
+<span class="cmt">// Call this on: checkout, app resume, every 15 minutes, network reconnect</span></pre>
+    </div>
+
+    <!-- ── ANDROID ── -->
+    <div class="section" id="android">
+      <h2><span class="section-icon">🤖</span>Android Integration</h2>
+
+      <div class="alert alert-green">
+        <span class="alert-icon">✅</span>
+        <span>Use <strong>FusedLocationProviderClient</strong> for battery-efficient GPS. Use <strong>WorkManager</strong> for the periodic 15-minute sync. Use <strong>GeofencingClient</strong> for office entry/exit events.</span>
+      </div>
+
+      <h3>Required Permissions (AndroidManifest.xml)</h3>
+<pre><span class="cmt">&lt;!-- Location --&gt;</span>
+&lt;uses-permission android:name=<span class="str">"android.permission.ACCESS_FINE_LOCATION"</span> /&gt;
+&lt;uses-permission android:name=<span class="str">"android.permission.ACCESS_COARSE_LOCATION"</span> /&gt;
+&lt;uses-permission android:name=<span class="str">"android.permission.ACCESS_BACKGROUND_LOCATION"</span> /&gt;
+
+<span class="cmt">&lt;!-- Network state for WiFi tracking --&gt;</span>
+&lt;uses-permission android:name=<span class="str">"android.permission.ACCESS_NETWORK_STATE"</span> /&gt;
+&lt;uses-permission android:name=<span class="str">"android.permission.ACCESS_WIFI_STATE"</span> /&gt;
+&lt;uses-permission android:name=<span class="str">"android.permission.CHANGE_NETWORK_STATE"</span> /&gt;
+
+<span class="cmt">&lt;!-- Keep alive in background --&gt;</span>
+&lt;uses-permission android:name=<span class="str">"android.permission.FOREGROUND_SERVICE"</span> /&gt;
+&lt;uses-permission android:name=<span class="str">"android.permission.RECEIVE_BOOT_COMPLETED"</span> /&gt;</pre>
+
+      <h3>Key Components</h3>
+<pre><span class="cmt">// 1. Foreground Service — keeps tracking alive even when screen is off</span>
+<span class="kw">class</span> <span class="key">ActivityTrackingService</span> : ForegroundService() <span class="brace">{</span>
+  override <span class="kw">fun</span> <span class="key">onStartCommand</span>(...): Int <span class="brace">{</span>
+    startForeground(NOTIF_ID, buildNotification(<span class="str">"Tracking active…"</span>))
+    startGPS(); startWiFiMonitor(); startGeofence()
+    <span class="kw">return</span> START_STICKY     <span class="cmt">// restart if killed</span>
+  <span class="brace">}</span>
+<span class="brace">}</span>
+
+<span class="cmt">// 2. GPS — request updates via FusedLocationProviderClient</span>
+<span class="kw">val</span> req = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, <span class="num">30_000</span>L)
+  .setMinUpdateDistanceMeters(<span class="num">10f</span>)      <span class="cmt">// only on 10m+ movement</span>
+  .setMaxUpdateDelayMillis(<span class="num">60_000</span>L)    <span class="cmt">// force at least every 60s while moving</span>
+  .build()
+
+<span class="cmt">// 3. WiFi — register BroadcastReceiver for NETWORK_STATE_CHANGED_ACTION</span>
+<span class="kw">val</span> filter = IntentFilter(WifiManager.NETWORK_STATE_CHANGED_ACTION)
+registerReceiver(wifiReceiver, filter)
+
+<span class="cmt">// 4. WorkManager — periodic sync every 15 minutes</span>
+<span class="kw">val</span> work = PeriodicWorkRequestBuilder&lt;SyncWorker&gt;(<span class="num">15</span>, TimeUnit.MINUTES).build()
+WorkManager.getInstance(context).enqueueUniquePeriodicWork(<span class="str">"activity-sync"</span>, KEEP_ALIVE, work)
+
+<span class="cmt">// 5. Geofence — monitor office location</span>
+<span class="kw">val</span> geofence = Geofence.Builder()
+  .setRequestId(<span class="str">"office"</span>)
+  .setCircularRegion(officeLat, officeLng, <span class="num">100f</span>)   <span class="cmt">// 100m radius</span>
+  .setTransitionTypes(GEOFENCE_TRANSITION_ENTER or GEOFENCE_TRANSITION_EXIT)
+  .setExpirationDuration(NEVER_EXPIRE)
+  .build()</pre>
+    </div>
+
+    <!-- ── iOS ── -->
+    <div class="section" id="ios">
+      <h2><span class="section-icon">🍎</span>iOS Integration</h2>
+
+      <div class="alert alert-green">
+        <span class="alert-icon">✅</span>
+        <span>Use <strong>CLLocationManager</strong> with significant-change updates for battery-efficient background GPS. Use <strong>BGTaskScheduler</strong> for periodic syncing. Use <strong>CLCircularRegion</strong> for office geofencing.</span>
+      </div>
+
+      <h3>Info.plist Keys</h3>
+<pre><span class="cmt">&lt;!-- Add these to Info.plist --&gt;</span>
+NSLocationAlwaysAndWhenInUseUsageDescription
+NSLocationAlwaysUsageDescription
+NSLocationWhenInUseUsageDescription
+
+<span class="cmt">&lt;!-- Background modes: add both --&gt;</span>
+UIBackgroundModes: [location, fetch, processing]</pre>
+
+      <h3>Key Implementation</h3>
+<pre><span class="cmt">// Location Manager setup</span>
+<span class="kw">let</span> manager = CLLocationManager()
+manager.requestAlwaysAuthorization()
+manager.allowsBackgroundLocationUpdates = <span class="kw">true</span>
+manager.pausesLocationUpdatesAutomatically = <span class="kw">false</span>
+manager.desiredAccuracy = kCLLocationAccuracyBest
+manager.distanceFilter = <span class="num">10</span>         <span class="cmt">// 10m minimum displacement</span>
+manager.startUpdatingLocation()
+
+<span class="cmt">// Also register for significant-change updates (works when app is killed)</span>
+manager.startMonitoringSignificantLocationChanges()
+
+<span class="cmt">// Geofence — office region</span>
+<span class="kw">let</span> region = CLCircularRegion(
+  center: CLLocationCoordinate2D(latitude: officeLat, longitude: officeLng),
+  radius: <span class="num">100</span>, identifier: <span class="str">"office"</span>
+)
+region.notifyOnEntry = <span class="kw">true</span>; region.notifyOnExit = <span class="kw">true</span>
+manager.startMonitoring(for: region)
+
+<span class="cmt">// BGTaskScheduler — periodic sync</span>
+BGTaskScheduler.shared.register(forTaskWithIdentifier: <span class="str">"com.app.activity-sync"</span>, ...) <span class="brace">{</span> task <span class="kw">in</span>
+  syncToServer(date: today)
+  scheduleNextSync()
+<span class="brace">}</span>
+
+<span class="cmt">// WiFi — use CNCopyCurrentNetworkInfo and observe changes via reachability</span>
+NotificationCenter.default.addObserver(<span class="kw">self</span>, selector: #selector(wifiChanged),
+  name: .reachabilityChanged, object: <span class="kw">nil</span>)</pre>
+    </div>
+
+    <!-- ── BROWSER ── -->
+    <div class="section" id="browser">
+      <h2><span class="section-icon">🌐</span>Browser / Web App Integration</h2>
+
+      <div class="alert alert-warn">
+        <span class="alert-icon">⚠️</span>
+        <span>Browsers cannot detect WiFi SSIDs or network switches. <code>wifi_connect_count</code> and <code>wifi_networks_seen</code> should be left as 0/null when tracking from a web app. Focus on GPS, movement, and visibility state.</span>
+      </div>
+
+<pre><span class="cmt">// The employee dashboard auto-starts tracking for today's date.</span>
+<span class="cmt">// Here is the complete browser tracker snippet you can embed in any page:</span>
+
+<span class="kw">const</span> TRACKER = <span class="brace">{</span>
+  session_start: <span class="kw">new</span> Date().toISOString(),
+  platform: <span class="str">'web'</span>,
+  gps_connect_count: <span class="num">0</span>, gps_disconnect_count: <span class="num">0</span>,
+  gps_path: <span class="brace">[]</span>, total_distance_meters: <span class="num">0</span>,
+  time_traveling_minutes: <span class="num">0</span>, time_stationary_minutes: <span class="num">0</span>,
+  movement_event_count: <span class="num">0</span>, idle_streak_max_minutes: <span class="num">0</span>,
+  app_foreground_count: <span class="num">0</span>, app_background_count: <span class="num">0</span>,
+  app_foreground_minutes: <span class="num">0</span>, app_background_minutes: <span class="num">0</span>,
+  raw_events: <span class="brace">[]</span>,
+  _lastPos: <span class="kw">null</span>, _lastActivity: Date.now(),
+  _watchId: <span class="kw">null</span>, _fgStart: Date.now(), _bgStart: <span class="kw">null</span>,
+<span class="brace">}</span>;
+
+<span class="cmt">// Haversine</span>
+<span class="kw">function</span> haversine(lat1,lng1,lat2,lng2) <span class="brace">{</span>
+  <span class="kw">const</span> R=<span class="num">6371000</span>, dLat=(lat2-lat1)*Math.PI/<span class="num">180</span>, dLng=(lng2-lng1)*Math.PI/<span class="num">180</span>;
+  <span class="kw">const</span> a=Math.sin(dLat/<span class="num">2</span>)**<span class="num">2</span>+Math.cos(lat1*Math.PI/<span class="num">180</span>)*Math.cos(lat2*Math.PI/<span class="num">180</span>)*Math.sin(dLng/<span class="num">2</span>)**<span class="num">2</span>;
+  <span class="kw">return</span> R*<span class="num">2</span>*Math.atan2(Math.sqrt(a),Math.sqrt(<span class="num">1</span>-a));
+<span class="brace">}</span>
+
+<span class="cmt">// Start GPS watch</span>
+TRACKER._watchId = navigator.geolocation.watchPosition(
+  pos => <span class="brace">{</span>
+    <span class="kw">const</span> <span class="brace">{</span>latitude:lat, longitude:lng, accuracy:acc, speed<span class="brace">}</span> = pos.coords;
+    <span class="kw">const</span> dist = TRACKER._lastPos ? haversine(TRACKER._lastPos.lat, TRACKER._lastPos.lng, lat, lng) : <span class="num">0</span>;
+    <span class="kw">if</span> (dist > <span class="num">5</span>) <span class="brace">{</span> TRACKER.total_distance_meters += dist; TRACKER.movement_event_count++; <span class="brace">}</span>
+    TRACKER.gps_path.push(<span class="brace">{</span> lat, lng, acc: Math.round(acc), ts: <span class="kw">new</span> Date().toISOString(),
+      spd_kmh: speed ? +(speed*<span class="num">3.6</span>).toFixed(<span class="num">1</span>) : <span class="num">0</span>, is_moving: dist > <span class="num">5</span> <span class="brace">}</span>);
+    <span class="kw">if</span> (TRACKER.gps_path.length > <span class="num">200</span>) TRACKER.gps_path.shift();
+    TRACKER._lastPos = <span class="brace">{</span>lat, lng<span class="brace">}</span>;
+  <span class="brace">}</span>,
+  err => <span class="brace">{</span> TRACKER.gps_disconnect_count++; <span class="brace">}</span>,
+  <span class="brace">{</span> enableHighAccuracy: <span class="kw">true</span>, timeout: <span class="num">15000</span>, maximumAge: <span class="num">10000</span> <span class="brace">}</span>
+);
+
+<span class="cmt">// Visibility change (foreground/background proxy)</span>
+document.addEventListener(<span class="str">'visibilitychange'</span>, () => <span class="brace">{</span>
+  <span class="kw">const</span> now = Date.now();
+  <span class="kw">if</span> (document.hidden) <span class="brace">{</span>
+    TRACKER.app_background_count++;
+    TRACKER.app_foreground_minutes += Math.round((now - TRACKER._fgStart) / <span class="num">60000</span>);
+    TRACKER._bgStart = now;
+  <span class="brace">}</span> <span class="kw">else</span> <span class="brace">{</span>
+    TRACKER.app_foreground_count++;
+    <span class="kw">if</span> (TRACKER._bgStart) TRACKER.app_background_minutes += Math.round((now - TRACKER._bgStart) / <span class="num">60000</span>);
+    TRACKER._fgStart = now;
+  <span class="brace">}</span>
+<span class="brace">}</span>);
+
+<span class="cmt">// Sync every 5 minutes + on page unload</span>
+<span class="kw">async function</span> sync() <span class="brace">{</span>
+  TRACKER.session_end = <span class="kw">new</span> Date().toISOString();
+  <span class="kw">await</span> fetch(<span class="str">'/api/attendance/mobile/activity-log'</span>, <span class="brace">{</span>
+    method: <span class="str">'POST'</span>,
+    headers: <span class="brace">{</span> <span class="str">'Authorization'</span>: <span class="str">'Bearer '</span>+token, <span class="str">'Content-Type'</span>: <span class="str">'application/json'</span> <span class="brace">}</span>,
+    body: JSON.stringify(<span class="brace">{</span> attendance_date: today, ...TRACKER <span class="brace">}</span>)
+  <span class="brace">}</span>);
+<span class="brace">}</span>
+setInterval(sync, <span class="num">5</span> * <span class="num">60000</span>);
+window.addEventListener(<span class="str">'beforeunload'</span>, sync);</pre>
+
+      <div class="alert alert-info">
+        <span class="alert-icon">💡</span>
+        <span>The employee dashboard (<code>/dashboard</code>) already includes this tracker and auto-syncs while the page is open. The <strong>Activity Log</strong> page shows live GPS data and has a manual <em>Sync Now</em> button.</span>
+      </div>
+    </div>
+
+    <hr>
+    <div style="text-align:center;color:var(--muted);font-size:12px;padding:20px 0;">
+      Activity Tracking API — Attendance System &nbsp;·&nbsp; v1.0 &nbsp;·&nbsp;
+      <a href="/attendance/activity-logs" style="color:var(--accent);">View HR Dashboard →</a>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// Smooth scroll + active sidebar
+document.querySelectorAll('.nav-link').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      document.querySelectorAll('.nav-link').forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`.nav-link[href="#${entry.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+document.querySelectorAll('.section[id], .hero[id]').forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

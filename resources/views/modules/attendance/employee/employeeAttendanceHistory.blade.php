@@ -162,10 +162,11 @@
             <th>Mode</th>
             <th>Work Mode</th>
             <th>Approval</th>
+            <th>Activity</th>
           </tr>
         </thead>
         <tbody id="histTbody">
-          <tr><td colspan="11" class="hist-empty"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading your attendance history…</td></tr>
+          <tr><td colspan="12" class="hist-empty"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading your attendance history…</td></tr>
         </tbody>
       </table>
     </div>
@@ -314,7 +315,7 @@
 
   async function load() {
     document.getElementById('histTbody').innerHTML =
-      `<tr><td colspan="11" class="hist-empty"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading…</td></tr>`;
+      `<tr><td colspan="12" class="hist-empty"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading…</td></tr>`;
     try {
       const res  = await API('/api/attendance/mobile/history?' + buildQuery());
       const json = await res.json();
@@ -346,13 +347,22 @@
         <td>${r.attendance_mode ? `<span class="pill pill-default">${esc(r.attendance_mode)}</span>` : '<span class="text-muted">—</span>'}</td>
         <td>${r.work_mode ? `<span class="pill pill-default">${esc(r.work_mode)}</span>` : '<span class="text-muted">—</span>'}</td>
         <td>${pill(r.approval_status)}</td>
+        <td>
+          <a href="/attendance/employee-activity?date=${esc(r.attendance_date)}"
+             style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;
+                    background:rgba(124,58,237,.1);color:#7c3aed;font-size:11px;font-weight:700;
+                    text-decoration:none;border:1px solid rgba(124,58,237,.18);transition:all .15s;"
+             title="View activity tracking for ${esc(r.attendance_date)}">
+            <i class="fa-solid fa-satellite-dish"></i> Activity
+          </a>
+        </td>
       </tr>`;
     }).join('');
   }
 
   function renderEmpty(msg) {
     document.getElementById('histTbody').innerHTML =
-      `<tr><td colspan="11" class="hist-empty"><i class="fa-regular fa-folder-open me-2"></i>${msg}</td></tr>`;
+      `<tr><td colspan="12" class="hist-empty"><i class="fa-regular fa-folder-open me-2"></i>${msg}</td></tr>`;
   }
 
   function renderPager(pg) {

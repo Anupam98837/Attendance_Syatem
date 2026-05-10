@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flutter Attendance Background Tracking Guide</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --muted:#475569;
+      --line:#dbe4ef;
+      --brand:#0f766e;
+      --brand-soft:#ecfeff;
+      --accent:#1d4ed8;
+      --code:#0b1220;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:var(--bg);
+      color:var(--ink);
+      line-height:1.65;
+    }
+    .wrap{
+      max-width:1180px;
+      margin:0 auto;
+      padding:30px 18px 60px;
+    }
+    .hero,.card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:24px;
+      box-shadow:0 16px 36px rgba(15,23,42,.06);
+    }
+    .hero{
+      padding:30px;
+      background:linear-gradient(135deg, rgba(15,118,110,.09), rgba(29,78,216,.08));
+    }
+    .card{
+      margin-top:18px;
+      padding:24px;
+    }
+    h1,h2,h3{margin:0 0 12px}
+    h1{font-size:34px}
+    h2{font-size:24px}
+    h3{font-size:18px}
+    p{margin:0 0 12px}
+    .muted{color:var(--muted)}
+    .pill{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:999px;
+      background:var(--brand-soft);
+      color:var(--brand);
+      font-weight:700;
+      font-size:12px;
+      margin:0 8px 8px 0;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:16px;
+    }
+    .grid-3{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:14px;
+    }
+    .mini{
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:16px;
+      background:#fbfdff;
+    }
+    .flow{
+      border:1px dashed #bfd4ea;
+      border-radius:18px;
+      padding:14px 16px;
+      background:#f8fbff;
+      font-weight:700;
+    }
+    .endpoint{
+      border-top:1px solid var(--line);
+      padding-top:18px;
+      margin-top:18px;
+    }
+    .endpoint:first-child{
+      border-top:none;
+      padding-top:0;
+      margin-top:0;
+    }
+    .method{
+      display:inline-block;
+      min-width:60px;
+      text-align:center;
+      padding:4px 8px;
+      border-radius:10px;
+      font-weight:800;
+      font-size:12px;
+      margin-right:8px;
+      background:#dcfce7;
+      color:#166534;
+    }
+    .post{background:#dbeafe;color:#1d4ed8}
+    .code{
+      background:var(--code);
+      color:#e2e8f0;
+      border-radius:16px;
+      padding:16px;
+      overflow:auto;
+      white-space:pre-wrap;
+      word-break:break-word;
+      font-size:13px;
+      font-family:Menlo, Monaco, Consolas, monospace;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:10px;
+    }
+    th,td{
+      border:1px solid var(--line);
+      padding:10px 12px;
+      text-align:left;
+      vertical-align:top;
+      font-size:14px;
+    }
+    th{background:#f8fafc}
+    ul{margin:0;padding-left:18px}
+    .note{
+      padding:12px 14px;
+      border-radius:14px;
+      background:#eff6ff;
+      border:1px solid #bfdbfe;
+      color:#1e3a8a;
+      font-size:14px;
+      margin-top:12px;
+    }
+    @media (max-width: 900px){
+      .grid,.grid-3{grid-template-columns:1fr}
+      h1{font-size:28px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="pill">Flutter Mobile Handoff</div>
+      <div class="pill">Background Tracking</div>
+      <div class="pill">Attendance Detail Ready</div>
+      <h1>Flutter Attendance Background Tracking Guide</h1>
+      <p class="muted">
+        This document explains how to build the employee mobile app for the new attendance flow:
+        login, home/profile, check-in, check-out, attendance history, and continuous background location tracking
+        from check-in until check-out.
+      </p>
+      <div class="flow">
+        Login → Bootstrap → Check policy/device/IP/location → Check In → Start foreground/background tracking →
+        Auto sync pending items → Check Out → Stop tracking → History
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>1. Base Setup</h2>
+      <table>
+        <tr><th>Item</th><th>Value</th></tr>
+        <tr><td>Base API URL</td><td><code>https://preview10.tecnixs.com/api</code></td></tr>
+        <tr><td>Auth</td><td>Bearer token</td></tr>
+        <tr><td>Employee Role</td><td><code>employee</code></td></tr>
+        <tr><td>Main Mobile Scope</td><td>Login, profile/home, check-in, check-out, active session, history, background tracking, offline sync</td></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>2. What The App Should Do</h2>
+      <div class="grid-3">
+        <div class="mini">
+          <h3>Pre-Punch Validation</h3>
+          <p class="muted">Load employee policy, branch, shift, allowed IP patterns, geofence rules, selfie rules, and device-binding rules before allowing a punch.</p>
+        </div>
+        <div class="mini">
+          <h3>Active Session Tracking</h3>
+          <p class="muted">After check-in, keep tracking live location until check-out. Send online pings immediately or queue them offline.</p>
+        </div>
+        <div class="mini">
+          <h3>Offline Recovery</h3>
+          <p class="muted">Store punch events and location pings in local SQLite when offline, then sync them in order when internet returns.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. High-Level Mobile Flow</h2>
+      <div class="code">1. Employee logs in
+2. Call /attendance/mobile/bootstrap
+3. Store:
+   - employee profile
+   - shift
+   - branch geofence
+   - allowed branch IP patterns
+   - attendance policy
+   - current attendance status
+4. Call /attendance/mobile/request-ip
+5. Detect:
+   - current GPS
+   - current device ID
+   - current request IP
+   - selfie readiness
+6. Before punch:
+   - verify GPS if policy requires it
+   - verify branch geofence if policy requires it
+   - verify request IP if office attendance requires allowed Wi-Fi/IP
+   - verify selfie if policy requires it
+   - verify device binding if policy requires it
+7. Call /attendance/mobile/punch
+8. If check-in succeeds and session stays active:
+   - start background tracking loop
+   - start online/offline sync worker
+9. While checked in:
+   - call /attendance/mobile/location-ping on interval or movement threshold
+   - refresh /attendance/mobile/active-session periodically
+10. On check-out:
+   - call /attendance/mobile/punch with check_out
+   - stop background tracking
+   - flush pending queue if online</div>
+    </section>
+
+    <section class="card">
+      <h2>4. Main APIs</h2>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/auth/login</h3>
+        <p>Login using email or phone and password.</p>
+        <div class="code">{
+  "login": "employee@gmail.com",
+  "password": "employee@123",
+  "remember": true
+}</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/bootstrap</h3>
+        <p>Load employee dashboard essentials immediately after login.</p>
+        <p>Important response fields to store:</p>
+        <div class="code">data.company.timezone
+data.employee.employee_code
+data.employee.branch_name
+data.employee.branch_latitude
+data.employee.branch_longitude
+data.employee.geofence_radius_meters
+data.employee.shift_name
+data.employee.start_time
+data.employee.end_time
+data.employee.gps_required
+data.employee.selfie_required
+data.employee.checkout_selfie_required
+data.employee.device_binding_required
+data.employee.geofence_required
+data.employee.wifi_ip_restriction_required
+data.employee.continuous_tracking_enabled
+data.employee.continuous_tracking_interval_seconds
+data.employee.allow_field_attendance
+data.employee.allow_wfh_attendance
+data.branch_networks
+data.today_attendance</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/request-ip</h3>
+        <p>Get the server-seen request IP. Use this before every punch and during active session refresh.</p>
+        <div class="code">{
+  "status": "success",
+  "data": {
+    "request_ip": "103.120.12.10",
+    "is_loopback": false,
+    "hint": null,
+    "server_time": "2026-05-09T12:00:00+05:30"
+  }
+}</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/active-session</h3>
+        <p>Use this to know whether the employee is currently checked in and to load recent tracks already stored by the server.</p>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/attendance/mobile/punch</h3>
+        <p>Used for both check-in and check-out.</p>
+        <p>Recommended multipart payload:</p>
+        <div class="code">punch_type=check_in | check_out
+attendance_mode=online | offline
+work_mode=office | field | wfh | hybrid
+occurred_at=2026-05-09T09:58:02+05:30
+latitude=22.5726451
+longitude=88.3638891
+gps_accuracy_meters=12
+location_text=22.57265, 88.36389 (±12m)
+device_id=DEVICE_UNIQUE_ID
+device_name=Samsung Galaxy M14
+device_platform=android
+device_model=SM-M145F
+os_version=Android 14
+app_version=1.0.0
+battery_level=83
+network_type=wifi
+internet_status=online
+remarks=Optional note
+selfie=(multipart file)</div>
+        <div class="note">
+          If the API returns exceptions like <code>outside_geofence</code>, <code>wifi_ip_not_allowed</code>,
+          <code>device_not_bound</code>, or <code>selfie_missing</code>, the app should show the reason and stop silent success handling.
+        </div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/attendance/mobile/location-ping</h3>
+        <p>This is the main tracking API for silent location updates after check-in.</p>
+        <div class="code">{
+  "attendance_id": 23,
+  "recorded_at": "2026-05-09T10:21:14+05:30",
+  "latitude": 22.5727012,
+  "longitude": 88.3639011,
+  "gps_accuracy_meters": 18,
+  "battery_level": 79,
+  "network_type": "wifi",
+  "is_background": true,
+  "speed_kmph": 0.0,
+  "source": "flutter_background_service",
+  "sync_status": "synced",
+  "local_queue_id": "trk_1746775874_001",
+  "metadata": {
+    "provider": "gps",
+    "app_state": "background"
+  }
+}</div>
+        <p>Response:</p>
+        <div class="code">{
+  "status": "success",
+  "message": "Location ping recorded.",
+  "data": {
+    "id": 154,
+    "employee_attendance_id": 23,
+    "recorded_at": "2026-05-09 10:21:14",
+    "latitude": "22.5727012",
+    "longitude": "88.3639011",
+    "network_type": "wifi",
+    "source": "flutter_background_service",
+    "sync_status": "synced"
+  }
+}</div>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/attendance/mobile/activity-log/sync</h3>
+        <p>Use this to batch meaningful employee activity events instead of calling the server for every tiny UI action.</p>
+        <div class="code">{
+  "items": [
+    {
+      "activity": "dashboard_opened",
+      "title": "Dashboard opened",
+      "description": "Employee opened the attendance dashboard",
+      "attendance_id": 23,
+      "occurred_at": "2026-05-09T10:01:12+05:30",
+      "source": "flutter_employee_app",
+      "local_queue_id": "act_1746774672_001",
+      "session_key": "sess_1746774672_ab12",
+      "category": "attendance_session",
+      "severity": "info",
+      "data": {
+        "network_type": "wifi",
+        "request_ip": "103.120.12.10",
+        "location": "22.57265, 88.36389 (±12m)"
+      }
+    },
+    {
+      "activity": "gps_unavailable",
+      "title": "GPS unavailable",
+      "attendance_id": 23,
+      "occurred_at": "2026-05-09T10:09:42+05:30",
+      "source": "flutter_employee_app",
+      "local_queue_id": "act_1746775182_002",
+      "category": "attendance_session",
+      "severity": "warn",
+      "data": {
+        "reason": "location_permission_denied"
+      }
+    }
+  ]
+}</div>
+        <p>Recommended events:</p>
+        <ul>
+          <li><code>dashboard_opened</code></li>
+          <li><code>dashboard_resumed</code></li>
+          <li><code>network_online</code></li>
+          <li><code>network_offline</code></li>
+          <li><code>network_changed</code></li>
+          <li><code>gps_acquired</code></li>
+          <li><code>gps_unavailable</code></li>
+          <li><code>tracking_started</code></li>
+          <li><code>movement_tracked</code></li>
+          <li><code>tracking_stopped</code></li>
+          <li><code>punch_attempted</code></li>
+          <li><code>punch_captured</code></li>
+          <li><code>attendance_flagged_for_review</code></li>
+        </ul>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method post">POST</span>/attendance/mobile/sync</h3>
+        <p>Use this when offline punch events or offline tracking rows need to be synced later.</p>
+        <p>Recommended use:</p>
+        <ul>
+          <li>Queue offline punch items in SQLite</li>
+          <li>Queue offline tracking pings in SQLite</li>
+          <li>When internet returns, send them in chronological order</li>
+        </ul>
+      </div>
+
+      <div class="endpoint">
+        <h3><span class="method">GET</span>/attendance/mobile/history</h3>
+        <p>Use this for the employee attendance history screen.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5. Background Tracking Rules</h2>
+      <table>
+        <tr><th>Case</th><th>Recommended App Behavior</th></tr>
+        <tr><td>Employee not checked in</td><td>Do not run silent tracking service.</td></tr>
+        <tr><td>Employee checked in</td><td>Start foreground/background tracking worker.</td></tr>
+        <tr><td>Policy continuous tracking disabled</td><td>Do not start background worker. Only send punch-time location.</td></tr>
+        <tr><td>Policy interval available</td><td>Use <code>continuous_tracking_interval_seconds</code> from bootstrap.</td></tr>
+        <tr><td>App online</td><td>Send pings directly to <code>/attendance/mobile/location-ping</code>.</td></tr>
+        <tr><td>App offline</td><td>Queue pings in SQLite with local queue IDs.</td></tr>
+        <tr><td>Internet restored</td><td>Sync queued items oldest first.</td></tr>
+        <tr><td>Employee checked out</td><td>Stop background worker and clear active tracking state.</td></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>6. Recommended Tracking Strategy</h2>
+      <div class="grid">
+        <div class="mini">
+          <h3>Foreground</h3>
+          <ul>
+            <li>Refresh request IP every 45 seconds.</li>
+            <li>Refresh active session every 45 seconds.</li>
+            <li>Send location ping on configured interval.</li>
+            <li>Also send a ping if movement threshold is crossed, for example 20 meters.</li>
+          </ul>
+        </div>
+        <div class="mini">
+          <h3>Background</h3>
+          <ul>
+            <li>Run a background service only after check-in.</li>
+            <li>Use device location callbacks to capture movement.</li>
+            <li>Save queue items locally if network fails.</li>
+            <li>Mark background pings with <code>is_background=true</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>7. What To Store In SQLite</h2>
+      <table>
+        <tr><th>Table</th><th>Purpose</th></tr>
+        <tr><td>pending_punch_queue</td><td>Offline check-in/check-out events</td></tr>
+        <tr><td>pending_track_queue</td><td>Offline background/foreground location pings</td></tr>
+        <tr><td>pending_activity_queue</td><td>Batched employee activity events like GPS fail, internet switch, dashboard resume, punch attempt, and movement activity</td></tr>
+        <tr><td>active_attendance_session</td><td>Current open attendance ID, start time, work mode, and policy flags</td></tr>
+        <tr><td>employee_bootstrap_cache</td><td>Last employee policy, branch, shift, and IP pattern data</td></tr>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>8. Suggested Flutter Service Design</h2>
+      <div class="code">AttendanceApiService
+- login()
+- getProfile()
+- getBootstrap()
+- getRequestIp()
+- getActiveSession()
+- punch()
+- sendLocationPing()
+- syncPendingItems()
+- getHistory()
+
+AttendanceTrackerService
+- startTracking(attendanceId, policy)
+- stopTracking()
+- collectCurrentLocation()
+- onMovement()
+- onIntervalTick()
+- queueOfflineTrack()
+- flushPendingQueue()
+
+EmployeeActivityQueueService
+- enqueueActivity()
+- flushActivityBatch()
+- attachAttendanceIdWhenAvailable()
+- retryPendingActivityItems()
+
+AttendanceSessionStore
+- saveActiveSession()
+- getActiveSession()
+- clearActiveSession()
+
+AttendanceGuard
+- validateGps()
+- validateGeofence()
+- validateRequestIp()
+- validateDevice()
+- validateSelfie()</div>
+    </section>
+
+    <section class="card">
+      <h2>9. Important UI States</h2>
+      <div class="grid-3">
+        <div class="mini">
+          <h3>Before Check-In</h3>
+          <p class="muted">Show employee profile, branch, shift, policy badges, current GPS, current IP, device readiness, and selfie readiness.</p>
+        </div>
+        <div class="mini">
+          <h3>During Active Session</h3>
+          <p class="muted">Show checked-in time, live current location, last ping time, network/IP state, tracking state, and queue state.</p>
+        </div>
+        <div class="mini">
+          <h3>After Check-Out</h3>
+          <p class="muted">Show final check-out time, total worked duration, last location, sync state, and that tracking has stopped.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>10. Admin/HR Detail View The Mobile App Supports</h2>
+      <p>The backend now stores enough detail for web admin/HR to inspect:</p>
+      <ul>
+        <li>current employee location while session is active</li>
+        <li>movement trail from check-in to check-out</li>
+        <li>check-in selfie and check-out selfie</li>
+        <li>request IP used during punch</li>
+        <li>network type, sync status, and exception reasons</li>
+        <li>approval history for suspicious records</li>
+      </ul>
+      <p class="muted">That means the mobile app should keep the tracking payload rich and consistent, especially <code>attendance_id</code>, <code>recorded_at</code>, <code>latitude</code>, <code>longitude</code>, <code>network_type</code>, <code>battery_level</code>, <code>is_background</code>, and <code>local_queue_id</code>.</p>
+    </section>
+
+    <section class="card">
+      <h2>11. Final Recommended Implementation Order</h2>
+      <div class="code">Phase 1
+- Login
+- Bootstrap
+- Employee home/profile
+- Check-in
+- Check-out
+- Attendance history
+
+Phase 2
+- Active session refresh
+- Request IP refresh
+- Device ID binding
+- Camera selfie capture
+
+Phase 3
+- Background location tracking
+- SQLite offline queue
+- Auto sync worker
+- App resume/connectivity recovery
+
+Phase 4
+- Better fraud prevention
+- Better battery optimization handling
+- More detailed local tracking analytics</div>
+    </section>
+  </div>
+</body>
+</html>

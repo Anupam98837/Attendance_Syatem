@@ -331,7 +331,16 @@ class AttendanceMobileController extends Controller
                 SUM(CASE WHEN status = 'leave' THEN 1 ELSE 0 END) as leave_days,
                 SUM(CASE WHEN status = 'holiday' THEN 1 ELSE 0 END) as holiday_days,
                 SUM(CASE WHEN status = 'week_off' THEN 1 ELSE 0 END) as week_off_days,
-                SUM(COALESCE(total_working_minutes, 0)) as total_working_minutes,
+                SUM(
+                    COALESCE(
+                        total_working_minutes,
+                        CASE
+                            WHEN check_in_time IS NOT NULL AND check_out_time IS NOT NULL
+                            THEN GREATEST(TIMESTAMPDIFF(MINUTE, check_in_time, check_out_time) - COALESCE(break_minutes, 0), 0)
+                            ELSE 0
+                        END
+                    )
+                ) as total_working_minutes,
                 SUM(COALESCE(overtime_minutes, 0)) as total_overtime_minutes,
                 SUM(COALESCE(late_minutes, 0)) as total_late_minutes,
                 SUM(CASE WHEN approval_status = 'pending_approval' THEN 1 ELSE 0 END) as pending_approvals
@@ -378,6 +387,129 @@ class AttendanceMobileController extends Controller
                     'rejected' => (int) ($leaveSummary->rejected ?? 0),
                 ],
                 'pending_sync' => $pendingSync,
+            ],
+        ]);
+    }
+
+    public function syncActivityLogs(Request $request)
+    {
+        $validated = $request->validate([
+            'items' => 'required|array|min:1|max:200',
+            'items.*.activity' => 'required|string|max:80',
+            'items.*.title' => 'sometimes|nullable|string|max:160',
+            'items.*.description' => 'sometimes|nullable|string',
+            'items.*.attendance_id' => 'sometimes|nullable|integer',
+            'items.*.occurred_at' => 'sometimes|nullable|date',
+            'items.*.source' => 'sometimes|nullable|string|max:60',
+            'items.*.local_queue_id' => 'sometimes|nullable|string|max:120',
+            'items.*.session_key' => 'sometimes|nullable|string|max:120',
+            'items.*.category' => 'sometimes|nullable|string|max:60',
+            'items.*.severity' => 'sometimes|nullable|string|max:30',
+            'items.*.data' => 'sometimes|nullable|array',
+        ]);
+
+        $actor = $this->attendanceActor($request);
+        $saved = 0;
+        $failed = 0;
+        $results = [];
+
+        foreach ($validated['items'] as $item) {
+            try {
+                $attendanceId = !empty($item['attendance_id']) ? (int) $item['attendance_id'] : null;
+
+                if ($attendanceId) {
+                    $ownsAttendance = DB::table('employee_attendance')
+                        ->where('id', $attendanceId)
+                        ->where('user_id', $actor['id'])
+                        ->whereNull('deleted_at')
+                        ->exists();
+
+                    if (!$ownsAttendance) {
+                        $failed++;
+                        $results[] = [
+                            'activity' => $item['activity'],
+                            'local_queue_id' => $item['local_queue_id'] ?? null,
+                            'status' => 'error',
+                            'message' => 'Attendance record not found for this employee.',
+                        ];
+                        continue;
+                    }
+                }
+
+                $activityId = $this->storeEmployeeActivityLog($request, $actor, $item, $attendanceId);
+                $saved++;
+                $results[] = [
+                    'activity' => $item['activity'],
+                    'local_queue_id' => $item['local_queue_id'] ?? null,
+                    'status' => 'success',
+                    'id' => $activityId,
+                ];
+            } catch (\Throwable $e) {
+                $failed++;
+                $results[] = [
+                    'activity' => $item['activity'],
+                    'local_queue_id' => $item['local_queue_id'] ?? null,
+                    'status' => 'error',
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Employee activity logs synced.',
+            'data' => $results,
+            'summary' => [
+                'saved' => $saved,
+                'failed' => $failed,
+                'total' => count($validated['items']),
+            ],
+        ]);
+    }
+
+    public function myActivityLogs(Request $request)
+    {
+        $actor = $this->attendanceActor($request);
+        $perPage = max(1, min(100, (int) $request->query('per_page', 20)));
+
+        $query = DB::table('user_data_activity_log')
+            ->where('performed_by', $actor['id'])
+            ->where('module', 'attendance_activity');
+
+        if ($request->filled('attendance_id')) {
+            $query->where('table_name', 'employee_attendance')
+                ->where('record_id', (int) $request->query('attendance_id'));
+        }
+
+        if ($request->filled('activity')) {
+            $query->where('activity', $request->query('activity'));
+        }
+
+        if ($request->filled('from')) {
+            $query->whereDate('created_at', '>=', $request->query('from'));
+        }
+
+        if ($request->filled('to')) {
+            $query->whereDate('created_at', '<=', $request->query('to'));
+        }
+
+        $paginator = $query->orderByDesc('created_at')->orderByDesc('id')->paginate($perPage);
+
+        $rows = collect($paginator->items())->map(function ($row) {
+            $row->changed_fields = $this->decodeJson($row->changed_fields);
+            $row->old_values = $this->decodeJson($row->old_values);
+            $row->new_values = $this->decodeJson($row->new_values);
+            return $row;
+        })->values()->all();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $rows,
+            'pagination' => [
+                'page' => $paginator->currentPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                'last_page' => $paginator->lastPage(),
             ],
         ]);
     }
@@ -569,6 +701,7 @@ class AttendanceMobileController extends Controller
                     'sync_status' => 'synced',
                     'approval_status' => $approvalStatus,
                     'status' => $approvalStatus === 'pending_approval' ? 'pending_approval' : null,
+                    'break_minutes' => $employee->break_minutes ?? null,
                     'remarks' => $payload['remarks'] ?? null,
                     'metadata' => !empty($payload['metadata']) ? json_encode($payload['metadata'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
                     'created_at' => now(),
@@ -626,6 +759,7 @@ class AttendanceMobileController extends Controller
                 'approval_status' => $approvalStatus,
                 'sync_status' => 'synced',
                 'device_id' => $payload['device_id'] ?? null,
+                'break_minutes' => $existingRecord->break_minutes ?? $employee->break_minutes ?? null,
                 'remarks' => $payload['remarks'] ?? ($existingRecord->remarks ?? null),
                 'approved_at' => $approvalStatus === 'approved' ? now() : null,
                 'updated_at' => now(),
@@ -824,6 +958,55 @@ class AttendanceMobileController extends Controller
         return $record ? $this->decorateAttendanceRecord($record) : null;
     }
 
+    private function storeEmployeeActivityLog(Request $request, array $actor, array $item, ?int $attendanceId = null): int
+    {
+        $occurredAt = $this->parseClientTimestamp($item['occurred_at'] ?? null) ?? now();
+        $payload = $item['data'] ?? [];
+        $title = trim((string) ($item['title'] ?? ''));
+        $description = trim((string) ($item['description'] ?? ''));
+        $source = trim((string) ($item['source'] ?? 'employee_dashboard'));
+        $category = trim((string) ($item['category'] ?? 'attendance_session'));
+        $severity = trim((string) ($item['severity'] ?? 'info'));
+        $localQueueId = trim((string) ($item['local_queue_id'] ?? ''));
+        $sessionKey = trim((string) ($item['session_key'] ?? ''));
+
+        $newValues = array_merge($payload, [
+            'attendance_id' => $attendanceId,
+            'occurred_at' => $occurredAt->toIso8601String(),
+            'source' => $source ?: null,
+            'category' => $category ?: null,
+            'severity' => $severity ?: null,
+            'local_queue_id' => $localQueueId ?: null,
+            'session_key' => $sessionKey ?: null,
+            'server_received_at' => now()->toIso8601String(),
+            'request_ip' => $request->ip(),
+        ]);
+
+        $changedFields = array_values(array_unique(array_filter(array_map('strval', array_keys($newValues)))));
+        $logNote = trim(implode(' — ', array_filter([
+            $title ?: null,
+            $description ?: null,
+            $attendanceId ? ('Attendance #' . $attendanceId) : 'Employee session activity',
+        ])));
+
+        return DB::table('user_data_activity_log')->insertGetId([
+            'performed_by' => $actor['id'],
+            'performed_by_role' => $actor['role'] ?: 'employee',
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'activity' => $item['activity'],
+            'module' => 'attendance_activity',
+            'table_name' => $attendanceId ? 'employee_attendance' : 'users',
+            'record_id' => $attendanceId ?: $actor['id'],
+            'changed_fields' => !empty($changedFields) ? json_encode($changedFields, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) : null,
+            'old_values' => null,
+            'new_values' => json_encode($newValues, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            'log_note' => $logNote ?: null,
+            'created_at' => $occurredAt,
+            'updated_at' => now(),
+        ]);
+    }
+
     private function latestOpenAttendanceForUser(int $userId): ?object
     {
         return DB::table('employee_attendance')
@@ -880,6 +1063,15 @@ class AttendanceMobileController extends Controller
 
     private function decorateAttendanceRecord(object $record): object
     {
+        if (($record->total_working_minutes ?? null) === null) {
+            $record->total_working_minutes = $this->calculateWorkingMinutesFromTimes(
+                $record->check_in_time ?? null,
+                $record->check_out_time ?? null,
+                (int) ($record->break_minutes ?? 0),
+                false
+            );
+        }
+
         $latestLog = DB::table('attendance_logs')
             ->where('employee_attendance_id', $record->id)
             ->whereNull('deleted_at')

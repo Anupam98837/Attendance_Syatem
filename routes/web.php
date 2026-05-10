@@ -46,14 +46,8 @@ Route::view('/attendance/employee-mobile', 'modules.attendance.employee.manageEm
 Route::redirect('/attendance/employee-dashboard', '/dashboard');
 Route::view('/attendance/employee-history',   'modules.attendance.employee.employeeAttendanceHistory');
 Route::view('/attendance/employee-leaves',    'modules.attendance.employee.employeeLeaves');
-
-Route::get('/activity-logs', function () {
-    return view('pages.pages.common.placeholder', [
-        'pageTitle' => 'Activity Logs',
-        'pageLead' => 'User activity logging is preserved in the system and this screen is ready for the next attendance-specific implementation.',
-        'pageIcon' => 'fa-solid fa-clock-rotate-left',
-    ]);
-});
+Route::view('/attendance/employee-activity',  'modules.attendance.employee.employeeActivityLog');
+Route::view('/attendance/activity-logs',      'modules.attendance.operations.manageActivityLogs');
 
 Route::get('/notifications', function () {
     return view('pages.pages.common.placeholder', [

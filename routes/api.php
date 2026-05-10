@@ -9,6 +9,7 @@ use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\API\PagePrivilegeController;
 use App\Http\Controllers\API\RolePrivilegeController;
 use App\Http\Controllers\API\UserController;
+use App\Http\Controllers\API\ActivityTrackingController;
 use App\Http\Controllers\API\UserPrivilegeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -203,6 +204,7 @@ Route::prefix('attendance')->middleware('checkAuth')->group(function () {
         Route::get('/dashboard', [AttendanceOperationsController::class, 'dashboard']);
         Route::get('/live-attendance', [AttendanceOperationsController::class, 'liveAttendance']);
         Route::get('/attendance', [AttendanceOperationsController::class, 'attendanceIndex']);
+        Route::get('/attendance/{attendanceId}/detail', [AttendanceOperationsController::class, 'attendanceDetail']);
         Route::get('/pending-approvals', [AttendanceOperationsController::class, 'pendingApprovals']);
         Route::post('/approvals/{id}/decision', [AttendanceOperationsController::class, 'decideApproval']);
         Route::post('/attendance/{attendanceId}/manual-correction', [AttendanceOperationsController::class, 'manualCorrection']);
@@ -211,6 +213,9 @@ Route::prefix('attendance')->middleware('checkAuth')->group(function () {
         Route::get('/location-exceptions', [AttendanceOperationsController::class, 'locationExceptions']);
         Route::get('/leaves', [AttendanceOperationsController::class, 'leaveIndex']);
         Route::post('/leaves/{leaveId}/decision', [AttendanceOperationsController::class, 'decideLeave']);
+        // Activity tracking viewer
+        Route::get('/activity-logs', [ActivityTrackingController::class, 'listActivityLogs']);
+        Route::get('/activity-logs/{id}', [ActivityTrackingController::class, 'getActivityLog']);
     });
 
     Route::middleware('role:employee')->prefix('mobile')->group(function () {
@@ -220,10 +225,16 @@ Route::prefix('attendance')->middleware('checkAuth')->group(function () {
         Route::get('/history', [AttendanceMobileController::class, 'history']);
         Route::post('/punch', [AttendanceMobileController::class, 'punch']);
         Route::post('/sync', [AttendanceMobileController::class, 'sync']);
+        Route::post('/activity-log/sync', [AttendanceMobileController::class, 'syncActivityLogs']);
+        Route::get('/activity-log', [AttendanceMobileController::class, 'myActivityLogs']);
         Route::post('/location-ping', [AttendanceMobileController::class, 'locationPing']);
         Route::get('/sync-queue', [AttendanceMobileController::class, 'syncQueue']);
         Route::get('/leaves', [AttendanceMobileController::class, 'myLeaves']);
         Route::post('/leaves', [AttendanceMobileController::class, 'applyLeave']);
         Route::get('/summary', [AttendanceMobileController::class, 'summary']);
+        // Activity tracking
+        Route::post('/activity-log', [ActivityTrackingController::class, 'logActivity']);
+        Route::get('/activity-log', [ActivityTrackingController::class, 'myActivityLog']);
     });
+
 });

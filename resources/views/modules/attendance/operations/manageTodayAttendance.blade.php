@@ -129,6 +129,7 @@
   display:grid;
   gap:12px;
   margin-top:16px;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
 }
 .live-detail-item{
   border:1px solid var(--line-soft);
@@ -161,6 +162,12 @@
   min-width:38px;
   border-radius:12px;
 }
+.live-action-row{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
 @media (max-width: 1399.98px){
   .live-stats{grid-template-columns:repeat(3, minmax(0, 1fr))}
 }
@@ -169,6 +176,7 @@
 }
 @media (max-width: 767.98px){
   .live-stats{grid-template-columns:repeat(2, minmax(0, 1fr))}
+  .live-detail-grid{grid-template-columns:1fr}
 }
 </style>
 @endpush
@@ -231,7 +239,7 @@
               <th>Working</th>
               <th>Approval</th>
               <th>Location</th>
-              <th class="text-end">Map</th>
+              <th class="text-end">Actions</th>
             </tr>
           </thead>
           <tbody id="liveTbody">
@@ -441,11 +449,159 @@
             </div>
           </td>
           <td class="text-end">
-            ${coords ? `<a class="btn btn-sm btn-outline-primary js-map-link" href="${mapHref}" target="_blank" rel="noopener">Map</a>` : '<span class="text-muted">—</span>'}
+            <div class="live-action-row">
+              ${coords ? `<a class="btn btn-sm btn-outline-primary js-map-link" href="${mapHref}" target="_blank" rel="noopener">Map</a>` : ''}
+              ${row.attendance_id ? `<button type="button" class="btn btn-sm btn-primary js-view-detail" data-attendance-id="${row.attendance_id}">View</button>` : '<span class="text-muted">—</span>'}
+            </div>
           </td>
         </tr>
       `;
     }).join('');
+  }
+
+  function proofImage(url, label) {
+    if (!url) {
+      return `<div class="live-detail-item"><span>${esc(label)}</span><strong>No selfie captured.</strong></div>`;
+    }
+    return `
+      <div class="live-detail-item">
+        <span>${esc(label)}</span>
+        <strong><a href="${esc(url)}" target="_blank" rel="noopener">Open full image</a></strong>
+        <img src="${esc(url)}" alt="${esc(label)}" style="width:100%;max-height:320px;object-fit:contain;border-radius:14px;border:1px solid var(--line-soft);margin-top:10px;background:#fff;">
+      </div>
+    `;
+  }
+
+  function detailTrackRows(rows) {
+    if (!rows.length) {
+      return '<tr><td colspan="4" class="text-center text-muted py-3">No movement points recorded.</td></tr>';
+    }
+    return rows.slice().reverse().map((row) => `
+      <tr>
+        <td>${esc(fmtDateTime(row.recorded_at))}</td>
+        <td>${esc(row.location_label || '—')}</td>
+        <td>${esc(row.network_type || '—')}</td>
+        <td>${badge(row.sync_status || 'synced')}</td>
+      </tr>
+    `).join('');
+  }
+
+  function detailLogRows(rows) {
+    if (!rows.length) {
+      return '<tr><td colspan="5" class="text-center text-muted py-3">No punch logs recorded.</td></tr>';
+    }
+    return rows.map((row) => `
+      <tr>
+        <td>${badge(row.punch_type || 'punch')}</td>
+        <td>${esc(fmtDateTime(row.punch_time))}</td>
+        <td>${esc(row.location_label || '—')}</td>
+        <td>${esc(row.request_ip || '—')}</td>
+        <td>${row.selfie_url ? `<a href="${esc(row.selfie_url)}" target="_blank" rel="noopener">Selfie</a>` : '<span class="text-muted">—</span>'}</td>
+      </tr>
+    `).join('');
+  }
+
+  function buildActivitySection(rows) {
+    if (!rows || !rows.length) {
+      return `
+        <div class="mt-3">
+          <h3 style="font-size:15px;margin-bottom:10px;">Employee Activity Timeline</h3>
+          <p class="text-muted small">No employee activity logs recorded for this session.</p>
+        </div>`;
+    }
+
+    const activityRows = rows.map((row) => {
+      const data = row.new_values || {};
+      const details = [
+        data.source ? `Source: ${data.source}` : null,
+        data.network_type ? `Network: ${data.network_type}` : null,
+        data.request_ip ? `IP: ${data.request_ip}` : null,
+        data.location ? `Location: ${data.location}` : null,
+      ].filter(Boolean).join(' · ');
+      return `
+        <tr>
+          <td>${esc(fmtDateTime(row.created_at))}</td>
+          <td>${badge(row.activity || 'activity')}</td>
+          <td>${esc(row.log_note || '—')}</td>
+          <td>${esc(String(data.severity || data.category || 'info').replace(/_/g, ' '))}</td>
+          <td>${details ? `<small>${esc(details)}</small>` : '<span class="text-muted">—</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="mt-3">
+        <h3 style="font-size:15px;margin-bottom:10px;">Employee Activity Timeline</h3>
+        <div style="overflow:auto;border:1px solid var(--line-soft);border-radius:16px;">
+          <table class="table mb-0">
+            <thead><tr><th>Occurred</th><th>Activity</th><th>Note</th><th>Level</th><th>Details</th></tr></thead>
+            <tbody>${activityRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  async function openAttendanceDetail(attendanceId) {
+    const res = await api(`/api/attendance/hr/attendance/${encodeURIComponent(attendanceId)}/detail`);
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Could not load attendance detail.');
+
+    const detail = json.data || {};
+    const attendance = detail.attendance || {};
+    const journey = detail.journey || {};
+    const proofs = detail.proofs || {};
+    const logs = Array.isArray(detail.logs) ? detail.logs : [];
+    const tracks = Array.isArray(detail.tracks) ? detail.tracks : [];
+    const activityLogs = Array.isArray(detail.activity_logs) ? detail.activity_logs : [];
+    const current = journey.current_location || {};
+    const currentMap = current.latitude !== null && current.latitude !== undefined && current.longitude !== null && current.longitude !== undefined
+      ? `https://maps.google.com/?q=${current.latitude},${current.longitude}`
+      : null;
+
+    await Swal.fire({
+      title: 'Attendance Detail',
+      width: 1160,
+      confirmButtonText: 'Close',
+      html: `
+        <div class="text-start">
+          <div class="live-detail-grid" style="margin-top:0;">
+            <div class="live-detail-item"><span>Employee</span><strong>${esc(attendance.name || '—')} · ${esc(attendance.employee_code || '—')}</strong></div>
+            <div class="live-detail-item"><span>Attendance Day</span><strong>${esc(attendance.attendance_date || '—')} · ${String(attendance.status || 'present').replace(/_/g, ' ')}</strong></div>
+            <div class="live-detail-item"><span>Current Location</span><strong>${esc(current.label || '—')}${currentMap ? `<br><a href="${esc(currentMap)}" target="_blank" rel="noopener">Open map</a>` : ''}</strong></div>
+            <div class="live-detail-item"><span>Analytics</span><strong>Late ${esc(minutesLabel(attendance.late_minutes))} · Working ${esc(minutesLabel(attendance.total_working_minutes))} · OT ${esc(minutesLabel(attendance.overtime_minutes))}</strong></div>
+            <div class="live-detail-item"><span>Tracking Summary</span><strong>${esc(String(journey.track_points || 0))} points · Last seen ${esc(fmtDateTime(journey.last_seen_at) || '—')}</strong></div>
+            <div class="live-detail-item"><span>Network & Approval</span><strong>${attendance.within_wifi_ip === 1 ? 'Allowed IP matched' : attendance.within_wifi_ip === 0 ? 'IP mismatch' : 'IP not checked'} · ${String(attendance.approval_status || 'approved').replace(/_/g, ' ')}</strong></div>
+          </div>
+
+          <div class="live-detail-grid mt-3">
+            ${proofImage(proofs.check_in_selfie?.url || null, 'Check In Selfie')}
+            ${proofImage(proofs.check_out_selfie?.url || null, 'Check Out Selfie')}
+          </div>
+
+          <div class="mt-3">
+            <h3 style="font-size:15px;margin-bottom:10px;">Punch Timeline</h3>
+            <div style="overflow:auto;border:1px solid var(--line-soft);border-radius:16px;">
+              <table class="table mb-0">
+                <thead><tr><th>Punch</th><th>Time</th><th>Location</th><th>Request IP</th><th>Proof</th></tr></thead>
+                <tbody>${detailLogRows(logs)}</tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <h3 style="font-size:15px;margin-bottom:10px;">Movement Tracking</h3>
+            <div style="overflow:auto;border:1px solid var(--line-soft);border-radius:16px;">
+              <table class="table mb-0">
+                <thead><tr><th>Recorded At</th><th>Location</th><th>Network</th><th>Sync</th></tr></thead>
+                <tbody>${detailTrackRows(tracks)}</tbody>
+              </table>
+            </div>
+          </div>
+
+          ${buildActivitySection(activityLogs)}
+        </div>
+      `,
+    });
   }
 
   function renderPager(pg) {
@@ -564,6 +720,14 @@
     loadRows();
   });
   document.getElementById('liveTbody').addEventListener('click', (event) => {
+    const detailBtn = event.target.closest('.js-view-detail');
+    if (detailBtn) {
+      event.stopPropagation();
+      openAttendanceDetail(detailBtn.dataset.attendanceId).catch((error) => {
+        Swal.fire('Could not open detail', error.message, 'error');
+      });
+      return;
+    }
     const rowEl = event.target.closest('tr[data-row-index]');
     if (!rowEl) return;
     const row = (window.__liveRows || [])[Number(rowEl.dataset.rowIndex || -1)];

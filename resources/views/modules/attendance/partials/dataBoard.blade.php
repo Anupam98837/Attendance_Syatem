@@ -6,6 +6,7 @@
   $boardFilters = $boardFilters ?? [];
   $boardDefaultQuery = $boardDefaultQuery ?? [];
   $boardActions = $boardActions ?? [];
+  $boardDetailEndpoint = $boardDetailEndpoint ?? '/api/attendance/hr/attendance/{id}/detail';
 @endphp
 
 @push('styles')
@@ -97,6 +98,135 @@
   color:var(--muted-color);
   line-height:1.5;
 }
+.att-detail{
+  text-align:left;
+}
+.att-detail-grid,
+.att-detail-proof-grid{
+  display:grid;
+  gap:12px;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+}
+.att-detail-card{
+  border:1px solid var(--line-soft);
+  border-radius:18px;
+  background:var(--surface-2);
+  padding:14px;
+}
+.att-detail-card span{
+  display:block;
+  margin-bottom:6px;
+  color:var(--muted-color);
+  font-size:11px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+}
+.att-detail-card strong{
+  color:var(--ink);
+  line-height:1.65;
+}
+.att-detail-section{
+  margin-top:18px;
+}
+.att-detail-section h4{
+  margin:0 0 10px;
+  font-size:14px;
+  font-weight:800;
+}
+.att-detail-proof{
+  border:1px solid var(--line-soft);
+  border-radius:18px;
+  padding:12px;
+  background:var(--surface-2);
+}
+.att-detail-proof img{
+  width:100%;
+  max-height:320px;
+  object-fit:contain;
+  border-radius:14px;
+  border:1px solid var(--line-soft);
+  margin-top:10px;
+  background:#fff;
+}
+.att-detail-table-wrap{
+  overflow:auto;
+  border:1px solid var(--line-soft);
+  border-radius:18px;
+}
+.att-detail-table{
+  width:100%;
+  border-collapse:collapse;
+  background:var(--surface);
+}
+.att-detail-table th,
+.att-detail-table td{
+  padding:10px 12px;
+  border-top:1px solid var(--line-soft);
+  vertical-align:top;
+  font-size:13px;
+}
+.att-detail-table thead th{
+  border-top:none;
+  background:var(--surface-3);
+  font-size:11px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.06em;
+  white-space:nowrap;
+}
+.att-detail-table small{
+  display:block;
+  color:var(--muted-color);
+  line-height:1.55;
+}
+.att-detail-map{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin-top:8px;
+  font-size:12px;
+  font-weight:700;
+  text-decoration:none;
+}
+@media (max-width: 767.98px){
+  .att-detail-proof-grid{grid-template-columns:1fr}
+}
+/* Activity log stats grid */
+.att-act-stats{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.att-act-stat{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  min-width:100px;
+  padding:10px 14px;
+  background:var(--surface-2,#f8f8f8);
+  border:1px solid var(--border-color,#e8e8e8);
+  border-radius:12px;
+  text-align:center;
+}
+.att-act-stat i{
+  font-size:16px;
+  color:#7c3aed;
+}
+.att-act-stat .label{
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:var(--muted-color,#888);
+}
+.att-act-stat .val{
+  font-size:13px;
+  font-weight:700;
+  color:var(--body-color,#222);
+}
 </style>
 @endpush
 
@@ -168,6 +298,7 @@
     filters: @json($boardFilters),
     defaults: @json($boardDefaultQuery),
     actions: @json($boardActions),
+    detailEndpoint: @json($boardDetailEndpoint),
   };
 
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
@@ -308,12 +439,50 @@
 
   function formatMinutes(value) {
     const minutes = Number(value || 0);
-    if (!Number.isFinite(minutes) || minutes <= 0) return '0m';
+    if (!Number.isFinite(minutes)) return '0m';
+    if (minutes < 0) return `-${formatMinutes(Math.abs(minutes))}`;
+    if (minutes === 0) return '0m';
     const hrs = Math.floor(minutes / 60);
     const mins = minutes % 60;
     if (!hrs) return `${mins}m`;
     if (!mins) return `${hrs}h`;
     return `${hrs}h ${mins}m`;
+  }
+
+  function yesNoMaybe(value, yes = 'Yes', no = 'No', maybe = '—') {
+    if (value === null || value === undefined || value === '') return maybe;
+    if (value === true || value === 1 || value === '1' || String(value).toLowerCase() === 'true') return yes;
+    if (value === false || value === 0 || value === '0' || String(value).toLowerCase() === 'false') return no;
+    return String(value);
+  }
+
+  function locationLabel(row) {
+    if (!row) return '—';
+    return row.location_label
+      || row.location_text
+      || row.label
+      || cellLocation(row.latitude, row.longitude, row.gps_accuracy_meters)
+      || '—';
+  }
+
+  function cellLocation(latitude, longitude, accuracy) {
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined || latitude === '' || longitude === '') {
+      return null;
+    }
+    const bits = [`${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}`];
+    if (accuracy !== null && accuracy !== undefined && accuracy !== '') bits.push(`±${Math.round(Number(accuracy))}m`);
+    return bits.join(' · ');
+  }
+
+  function mapHref(latitude, longitude) {
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined || latitude === '' || longitude === '') return null;
+    return `https://maps.google.com/?q=${encodeURIComponent(latitude)},${encodeURIComponent(longitude)}`;
+  }
+  function distanceLabel(meters) {
+    const value = Number(meters || 0);
+    if (!Number.isFinite(value) || value <= 0) return '0 m';
+    if (value >= 1000) return `${(value / 1000).toFixed(2)} km`;
+    return `${Math.round(value)} m`;
   }
 
   function badgeHtml(value) {
@@ -375,12 +544,252 @@
     return `
       <div class="att-board-actions">
         ${config.actions.map((action) => `
-          <button type="button" class="btn btn-sm ${action.btn || 'btn-light'} js-board-action" data-action="${action.type}" data-id="${row[action.idKey || 'id']}">
-            <i class="${action.icon}"></i>
+          <button type="button" class="btn btn-sm ${action.btn || 'btn-light'} js-board-action" data-action="${action.type}" data-id="${row[action.idKey || 'id']}" title="${escapeHtml(action.label || action.type)}">
+            <i class="${action.icon}"></i>${action.label ? ` <span>${escapeHtml(action.label)}</span>` : ''}
           </button>
         `).join('')}
       </div>
     `;
+  }
+
+  function renderDetailCard(label, value) {
+    return `
+      <div class="att-detail-card">
+        <span>${escapeHtml(label)}</span>
+        <strong>${value || '—'}</strong>
+      </div>
+    `;
+  }
+
+  function renderProofCard(title, proof) {
+    if (!proof?.url) {
+      return `
+        <div class="att-detail-proof">
+          <strong>${escapeHtml(title)}</strong>
+          <div class="text-muted mt-2">No selfie captured.</div>
+        </div>
+      `;
+    }
+    return `
+      <div class="att-detail-proof">
+        <strong>${escapeHtml(title)}</strong>
+        <a href="${escapeHtml(proof.url)}" target="_blank" rel="noopener" class="att-detail-map"><i class="fa-solid fa-image"></i>Open full image</a>
+        <img src="${escapeHtml(proof.url)}" alt="${escapeHtml(title)}">
+      </div>
+    `;
+  }
+
+  function renderLogRows(logs) {
+    if (!logs.length) {
+      return '<tr><td colspan="7" class="text-muted text-center py-3">No punch logs recorded.</td></tr>';
+    }
+    return logs.map((log) => {
+      const mapUrl = mapHref(log.latitude, log.longitude);
+      return `
+        <tr>
+          <td>${badgeHtml(log.punch_type || 'punch')}</td>
+          <td>${escapeHtml(formatDateTime(log.punch_time) || '—')}</td>
+          <td>${escapeHtml(locationLabel(log))}${mapUrl ? `<a class="att-detail-map" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i>Map</a>` : ''}</td>
+          <td>${badgeHtml(log.attendance_mode || 'online')} ${log.work_mode ? badgeHtml(log.work_mode) : ''}</td>
+          <td>${escapeHtml(log.request_ip || '—')}<small>${escapeHtml(log.network_type || '—')} · ${escapeHtml(log.internet_status || '—')}</small></td>
+          <td>${log.selfie_url ? `<a href="${escapeHtml(log.selfie_url)}" target="_blank" rel="noopener" class="att-detail-map"><i class="fa-solid fa-camera"></i>Selfie</a>` : '<span class="text-muted">—</span>'}</td>
+          <td>${log.exception_reason ? `${badgeHtml('pending_approval')}<small>${escapeHtml(log.exception_reason)}</small>` : badgeHtml(log.sync_status || 'synced')}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderTrackRows(tracks) {
+    if (!tracks.length) {
+      return '<tr><td colspan="6" class="text-muted text-center py-3">No live tracking points recorded.</td></tr>';
+    }
+    return tracks.slice().reverse().map((track) => {
+      const mapUrl = mapHref(track.latitude, track.longitude);
+      return `
+        <tr>
+          <td>${escapeHtml(formatDateTime(track.recorded_at) || '—')}</td>
+          <td>${escapeHtml(locationLabel(track))}${mapUrl ? `<a class="att-detail-map" href="${escapeHtml(mapUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i>Map</a>` : ''}</td>
+          <td>${escapeHtml(track.network_type || '—')}<small>${escapeHtml(track.source || 'tracking')}</small></td>
+          <td>${escapeHtml(track.speed_kmph !== null && track.speed_kmph !== undefined ? `${Number(track.speed_kmph).toFixed(1)} km/h` : '—')}</td>
+          <td>${escapeHtml(track.battery_level !== null && track.battery_level !== undefined ? `${track.battery_level}%` : '—')}</td>
+          <td>${badgeHtml(track.sync_status || 'synced')}</td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderApprovalRows(approvals) {
+    if (!approvals.length) {
+      return '<tr><td colspan="5" class="text-muted text-center py-3">No approval records.</td></tr>';
+    }
+    return approvals.map((approval) => `
+      <tr>
+        <td>${badgeHtml(approval.approval_type || 'approval')}</td>
+        <td>${escapeHtml(formatDateTime(approval.requested_at) || '—')}<small>${escapeHtml(approval.requested_by_name || 'System')}</small></td>
+        <td>${badgeHtml(approval.status || 'pending_approval')}</td>
+        <td>${escapeHtml(approval.approver_name || '—')}<small>${escapeHtml(formatDateTime(approval.decided_at) || 'Pending')}</small></td>
+        <td>${escapeHtml(approval.reason || approval.approver_remarks || '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderActivitySection(rows) {
+    if (!rows || !rows.length) {
+      return `
+        <div class="att-detail-section">
+          <h4>Employee Activity Timeline</h4>
+          <p class="text-muted small mb-0">No employee activity logs recorded for this session.</p>
+        </div>`;
+    }
+
+    const activityRows = rows.map((row) => {
+      const data = row.new_values || {};
+      const details = [
+        data.source ? `Source: ${data.source}` : null,
+        data.network_type ? `Network: ${data.network_type}` : null,
+        data.request_ip ? `IP: ${data.request_ip}` : null,
+        data.location ? `Location: ${data.location}` : null,
+        data.reason ? `Reason: ${data.reason}` : null,
+      ].filter(Boolean).join(' · ');
+
+      return `
+        <tr>
+          <td>${escapeHtml(formatDateTime(row.created_at) || '—')}</td>
+          <td>${badgeHtml(row.activity || 'activity')}</td>
+          <td>${escapeHtml(row.log_note || '—')}</td>
+          <td>${escapeHtml(String(data.severity || data.category || 'info').replace(/_/g, ' '))}</td>
+          <td>${details ? `<small>${escapeHtml(details)}</small>` : '<span class="text-muted">—</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="att-detail-section">
+        <h4>Employee Activity Timeline</h4>
+        <div class="att-detail-table-wrap">
+          <table class="att-detail-table">
+            <thead>
+              <tr>
+                <th>Occurred</th>
+                <th>Activity</th>
+                <th>Note</th>
+                <th>Level</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>${activityRows}</tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  async function viewAttendanceDetail(id) {
+    const endpoint = String(config.detailEndpoint || '').replace('{id}', encodeURIComponent(String(id)));
+    if (!endpoint) throw new Error('Attendance detail endpoint is not configured.');
+    const response = await fetch(endpoint, { headers: headers(false) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.message || 'Could not load attendance detail.');
+
+    const detail = payload.data || {};
+    const attendance = detail.attendance || {};
+    const journey = detail.journey || {};
+    const proofs = detail.proofs || {};
+    const logs = Array.isArray(detail.logs) ? detail.logs : [];
+    const tracks = Array.isArray(detail.tracks) ? detail.tracks : [];
+    const approvals = Array.isArray(detail.approvals) ? detail.approvals : [];
+    const activityLogs = Array.isArray(detail.activity_logs) ? detail.activity_logs : [];
+    const currentLocation = journey.current_location || {};
+    const currentMap = mapHref(currentLocation.latitude, currentLocation.longitude);
+
+    const summaryHtml = `
+      <div class="att-detail">
+        <div class="att-detail-grid">
+          ${renderDetailCard('Employee', `<div>${escapeHtml(attendance.name || '—')}</div><div class="text-muted small">${escapeHtml(attendance.employee_code || '—')} · ${escapeHtml(attendance.department_name || 'No Department')}</div>`)}
+          ${renderDetailCard('Attendance Day', `${escapeHtml(formatDate(attendance.attendance_date) || '—')}<div class="mt-1">${badgeHtml(attendance.status || 'present')} ${badgeHtml(attendance.approval_status || 'approved')}</div>`)}
+          ${renderDetailCard('Shift Window', `${escapeHtml(attendance.shift_name || '—')}<div class="text-muted small">${escapeHtml(formatDateTime(attendance.shift_start_time) || attendance.shift_start_time || '—')} to ${escapeHtml(formatDateTime(attendance.shift_end_time) || attendance.shift_end_time || '—')}</div>`)}
+          ${renderDetailCard('Check In / Out', `${escapeHtml(formatDateTime(attendance.check_in_time) || '—')}<div class="text-muted small mt-1">${escapeHtml(formatDateTime(attendance.check_out_time) || 'Still active')}</div>`)}
+          ${renderDetailCard('Work Analytics', `Worked ${escapeHtml(formatMinutes(attendance.total_working_minutes))}<div class="text-muted small mt-1">Late ${escapeHtml(formatMinutes(attendance.late_minutes))} · OT ${escapeHtml(formatMinutes(attendance.overtime_minutes))}</div>`)}
+          ${renderDetailCard('Policy Flags', `<div>${yesNoMaybe(attendance.within_geofence, 'Inside geofence', 'Outside geofence', 'Geofence not checked')}</div><div class="text-muted small mt-1">${yesNoMaybe(attendance.within_wifi_ip, 'Approved IP/Wi-Fi', 'IP/Wi-Fi mismatch', 'IP not checked')}</div>`)}
+          ${renderDetailCard('Current Location', `${escapeHtml(currentLocation.label || '—')}${currentMap ? `<a class="att-detail-map" href="${escapeHtml(currentMap)}" target="_blank" rel="noopener"><i class="fa-solid fa-map-location-dot"></i>Open map</a>` : ''}`)}
+          ${renderDetailCard('Tracking Summary', `${escapeHtml(String(journey.track_points ?? 0))} live points<div class="text-muted small mt-1">Route ${escapeHtml(distanceLabel(journey.path_distance_meters))} · Last seen ${escapeHtml(formatDateTime(journey.last_seen_at) || '—')}</div>`)}
+        </div>
+
+        <div class="att-detail-section">
+          <h4>Selfie Proofs</h4>
+          <div class="att-detail-proof-grid">
+            ${renderProofCard('Check In Selfie', proofs.check_in_selfie)}
+            ${renderProofCard('Check Out Selfie', proofs.check_out_selfie)}
+          </div>
+        </div>
+
+        <div class="att-detail-section">
+          <h4>Punch Timeline</h4>
+          <div class="att-detail-table-wrap">
+            <table class="att-detail-table">
+              <thead>
+                <tr>
+                  <th>Punch</th>
+                  <th>Time</th>
+                  <th>Location</th>
+                  <th>Mode</th>
+                  <th>Network</th>
+                  <th>Proof</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${renderLogRows(logs)}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="att-detail-section">
+          <h4>Movement Tracking</h4>
+          <div class="att-detail-table-wrap">
+            <table class="att-detail-table">
+              <thead>
+                <tr>
+                  <th>Recorded At</th>
+                  <th>Location</th>
+                  <th>Source</th>
+                  <th>Speed</th>
+                  <th>Battery</th>
+                  <th>Sync</th>
+                </tr>
+              </thead>
+              <tbody>${renderTrackRows(tracks)}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="att-detail-section">
+          <h4>Approval Trail</h4>
+          <div class="att-detail-table-wrap">
+            <table class="att-detail-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Requested</th>
+                  <th>Status</th>
+                  <th>Handled By</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>${renderApprovalRows(approvals)}</tbody>
+            </table>
+          </div>
+        </div>
+
+        ${renderActivitySection(activityLogs)}
+      </div>
+    `;
+
+    await Swal.fire({
+      title: 'Attendance Detail',
+      html: summaryHtml,
+      width: 1180,
+      confirmButtonText: 'Close',
+      customClass: { popup: 'swal-wide' },
+    });
   }
 
   function renderRows(rows) {
@@ -441,6 +850,11 @@
   }
 
   async function handleAction(type, id) {
+    if (type === 'view-attendance') {
+      await viewAttendanceDetail(id);
+      return;
+    }
+
     if (type === 'approve-approval' || type === 'reject-approval') {
       const decision = type === 'approve-approval' ? 'approve' : 'reject';
       const { value: remarks } = await Swal.fire({

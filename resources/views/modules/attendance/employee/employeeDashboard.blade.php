@@ -462,6 +462,40 @@
     </div>
   </div>
 
+  {{-- ═══ QUICK NAV CARDS ════════════════════════════════════════ --}}
+  <div class="emp-nav-grid">
+    <a href="/attendance/employee-history" class="emp-nav-card">
+      <div class="emp-nav-card-icon" style="background:rgba(14,165,233,.12);color:var(--primary-color);">
+        <i class="fa-solid fa-calendar-days"></i>
+      </div>
+      <div>
+        <h3>Attendance History</h3>
+        <p>View all past attendance records</p>
+      </div>
+      <i class="fa-solid fa-arrow-right arr"></i>
+    </a>
+    <a href="/attendance/employee-leaves" class="emp-nav-card">
+      <div class="emp-nav-card-icon" style="background:rgba(124,58,237,.12);color:#7c3aed;">
+        <i class="fa-solid fa-umbrella-beach"></i>
+      </div>
+      <div>
+        <h3>Leaves</h3>
+        <p>Apply for leave or check status</p>
+      </div>
+      <i class="fa-solid fa-arrow-right arr"></i>
+    </a>
+    <a href="/attendance/employee-activity" class="emp-nav-card">
+      <div class="emp-nav-card-icon" style="background:rgba(20,184,166,.12);color:#0d9488;">
+        <i class="fa-solid fa-satellite-dish"></i>
+      </div>
+      <div>
+        <h3>Activity Log</h3>
+        <p>GPS path, WiFi &amp; movement tracking</p>
+      </div>
+      <i class="fa-solid fa-arrow-right arr"></i>
+    </a>
+  </div>
+
   <div class="emp-panel-card" id="sessionCard" style="display:none;">
     <div class="emp-panel-head">
       <div>
@@ -505,15 +539,67 @@
   let localRole = (sessionStorage.getItem('role') || localStorage.getItem('role') || '').toLowerCase();
   if (!token) { window.location.replace('/'); return; }
 
+  function currentAuthToken() {
+    return sessionStorage.getItem('token') || localStorage.getItem('token') || '';
+  }
+
+  function hasActiveAuthToken() {
+    return !!currentAuthToken();
+  }
+
   const API = (path, opts = {}) => fetch(path, {
     ...opts,
     headers: {
-      'Authorization': 'Bearer ' + token,
+      'Authorization': 'Bearer ' + currentAuthToken(),
       'Accept': 'application/json',
       ...(opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       ...(opts.headers || {}),
     },
   });
+
+  const ACTIVITY_DEDUPE_STATE_KEY = 'employeeAttendanceActivityDedupeStateV3';
+  const ACTIVITY_ISSUE_STATE_KEY = 'employeeAttendanceActivityIssueStateV1';
+
+  function readActivityDedupeState() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(ACTIVITY_DEDUPE_STATE_KEY) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function writeActivityDedupeState(state) {
+    const now = Date.now();
+    const cleaned = {};
+    Object.entries(state || {})
+      .filter(([, value]) => Number(value) && now - Number(value) < IMPORTANT_ACTIVITY_DEDUPE_MS)
+      .slice(-250)
+      .forEach(([key, value]) => { cleaned[key] = Number(value); });
+    localStorage.setItem(ACTIVITY_DEDUPE_STATE_KEY, JSON.stringify(cleaned));
+    return cleaned;
+  }
+
+  function readActivityIssueState() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(ACTIVITY_ISSUE_STATE_KEY) || '{}');
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function writeActivityIssueState(state) {
+    const now = Date.now();
+    const cleaned = {};
+    Object.entries(state || {})
+      .filter(([, value]) => value && typeof value === 'object')
+      .filter(([, value]) => !Number(value.logged_at) || now - Number(value.logged_at) < 24 * 60 * 60 * 1000)
+      .slice(-250)
+      .forEach(([key, value]) => { cleaned[key] = value; });
+    localStorage.setItem(ACTIVITY_ISSUE_STATE_KEY, JSON.stringify(cleaned));
+    return cleaned;
+  }
 
   const S = {
     emp: null,
@@ -536,7 +622,180 @@
     trackTimer: null,
     trackIntervalSeconds: null,
     trackingTickBusy: false,
+    gpsWatchId: null,
+    presenceTimer: null,
+    sessionRefreshBusy: false,
+    lastTrackSentAt: 0,
+    lastTrackCoords: null,
+    activityQueueTimer: null,
+    activityFlushBusy: false,
+    lastLoggedIp: null,
+    lastLoggedGpsState: null,
+    activityTrackingDisabled: false,
+    lastImportantActivityAt: readActivityDedupeState(),
+    activeImportantIssues: readActivityIssueState(),
+    activitySessionKey: localStorage.getItem('employeeActivitySessionKey') || `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
   };
+  localStorage.setItem('employeeActivitySessionKey', S.activitySessionKey);
+  const ACTIVITY_QUEUE_KEY = 'employeeAttendanceActivityQueue';
+  const ACTIVITY_FLUSH_DELAY_MS = 20000;
+  const ACTIVITY_FLUSH_BATCH = 25;
+
+  // Keep the activity log useful: only security / mismatch / recovery / punch-result events are stored.
+  // Normal dashboard open, focus, heartbeat, GPS acquired, and movement pings are ignored.
+  const IMPORTANT_ACTIVITY_TYPES = new Set([
+    'gps_unavailable',
+    'gps_available_again',
+    'gps_geofence_mismatch',
+    'gps_geofence_unverified',
+    'gps_geofence_matched_again',
+    'request_ip_missing',
+    'request_ip_changed',
+    'branch_wifi_ip_mismatch',
+    'branch_wifi_ip_matched_again',
+    'punch_blocked_geofence',
+    'punch_blocked_network',
+    'punch_failed',
+    'punch_captured',
+    'attendance_flagged_for_review',
+  ]);
+
+  // Stateful issues log once while they are active. When they recover, a single recovery log is stored
+  // and the issue is cleared, so the same issue can be logged again only if it really happens again.
+  const STATEFUL_ISSUE_ACTIVITY_TYPES = new Set([
+    'gps_unavailable',
+    'gps_geofence_mismatch',
+    'gps_geofence_unverified',
+    'request_ip_missing',
+    'branch_wifi_ip_mismatch',
+  ]);
+
+  const RECOVERY_ACTIVITY_TYPES = new Set([
+    'gps_available_again',
+    'gps_geofence_matched_again',
+    'branch_wifi_ip_matched_again',
+  ]);
+
+  // Used only for one-shot punch logs; stateful issue logs use active/resolved state instead.
+  const IMPORTANT_ACTIVITY_DEDUPE_MS = 12 * 60 * 60 * 1000;
+
+  function activeAttendanceId() {
+    return S.activeSession?.id || S.todayAtt?.id || null;
+  }
+
+  function importantActivityMode(data = {}) {
+    return data.required_mode || data.work_mode || S.workMode || 'office';
+  }
+
+  function issueStateKey(activity, data = {}, options = {}) {
+    const att = options.attendanceId ?? data.attendance_id ?? activeAttendanceId() ?? 'no-attendance';
+    const mode = importantActivityMode(data);
+    if (activity === 'gps_unavailable' || activity === 'gps_available_again') return `gps:${att}:${mode}`;
+    if (activity === 'gps_geofence_mismatch' || activity === 'gps_geofence_unverified' || activity === 'gps_geofence_matched_again') return `geofence:${att}:${mode}`;
+    if (activity === 'request_ip_missing' || activity === 'branch_wifi_ip_mismatch' || activity === 'branch_wifi_ip_matched_again') return `network:${att}:${mode}`;
+    return `${activity}:${att}:${mode}`;
+  }
+
+  function importantActivityDedupeKey(activity, data = {}, options = {}) {
+    if (options.dedupeKey) return options.dedupeKey;
+    const att = options.attendanceId ?? data.attendance_id ?? activeAttendanceId() ?? 'no-attendance';
+    if (STATEFUL_ISSUE_ACTIVITY_TYPES.has(activity) || RECOVERY_ACTIVITY_TYPES.has(activity)) {
+      return `${activity}:${issueStateKey(activity, data, options)}`;
+    }
+    if (activity === 'request_ip_changed') return `${activity}:${att}:${data.previous_ip || 'old'}>${data.current_ip || 'new'}`;
+    if (activity.startsWith('punch_') || activity === 'attendance_flagged_for_review') return `${activity}:${att}:${data.punch_type || 'punch'}:${data.reason || ''}:${JSON.stringify(data.exceptions || [])}`;
+    return `${activity}:${att}`;
+  }
+
+  function queueAlreadyHasActivityKey(key) {
+    if (!key) return false;
+    return getActivityQueue().some((item) => item?.dedupe_key === key || item?.data?.activity_dedupe_key === key);
+  }
+
+  function resolveRecoveryIssueKeys(activity, data = {}, options = {}) {
+    const baseKey = issueStateKey(activity, data, options);
+    const issues = { ...readActivityIssueState(), ...S.activeImportantIssues };
+    const matched = [];
+
+    if (activity === 'gps_available_again') {
+      if (issues[baseKey]?.activity === 'gps_unavailable') matched.push(baseKey);
+    } else if (activity === 'gps_geofence_matched_again') {
+      if (['gps_geofence_mismatch', 'gps_geofence_unverified'].includes(issues[baseKey]?.activity)) matched.push(baseKey);
+    } else if (activity === 'branch_wifi_ip_matched_again') {
+      if (['request_ip_missing', 'branch_wifi_ip_mismatch'].includes(issues[baseKey]?.activity)) matched.push(baseKey);
+    }
+
+    return matched;
+  }
+
+  function shouldStoreImportantActivity(activity, data = {}, options = {}) {
+    if (S.activityTrackingDisabled || !hasActiveAuthToken()) return false;
+    if (!IMPORTANT_ACTIVITY_TYPES.has(activity)) return false;
+
+    // Do not create two records for the same issue: GPS unavailable already explains why geofence cannot verify.
+    if (activity === 'gps_geofence_unverified' && data.reason === 'gps_missing') return false;
+
+    const now = Date.now();
+
+    if (STATEFUL_ISSUE_ACTIVITY_TYPES.has(activity)) {
+      const issueKey = issueStateKey(activity, data, options);
+      const issueState = { ...readActivityIssueState(), ...S.activeImportantIssues };
+      const existing = issueState[issueKey];
+      if (existing?.activity === activity) return false;
+
+      issueState[issueKey] = {
+        activity,
+        logged_at: now,
+        attendance_id: options.attendanceId ?? data.attendance_id ?? activeAttendanceId() ?? null,
+        work_mode: importantActivityMode(data),
+        request_ip: data.current_ip || S.requestIp || null,
+      };
+      S.activeImportantIssues = writeActivityIssueState(issueState);
+      options._resolvedDedupeKey = importantActivityDedupeKey(activity, data, options);
+      if (queueAlreadyHasActivityKey(options._resolvedDedupeKey)) return false;
+      return true;
+    }
+
+    if (RECOVERY_ACTIVITY_TYPES.has(activity)) {
+      const matchedIssueKeys = resolveRecoveryIssueKeys(activity, data, options);
+      if (!matchedIssueKeys.length) return false;
+
+      const issueState = { ...readActivityIssueState(), ...S.activeImportantIssues };
+      matchedIssueKeys.forEach((key) => { delete issueState[key]; });
+      S.activeImportantIssues = writeActivityIssueState(issueState);
+      options._resolvedDedupeKey = importantActivityDedupeKey(activity, data, options);
+      if (queueAlreadyHasActivityKey(options._resolvedDedupeKey)) return false;
+      return true;
+    }
+
+    const key = importantActivityDedupeKey(activity, data, options);
+    options._resolvedDedupeKey = key;
+    const state = { ...readActivityDedupeState(), ...S.lastImportantActivityAt };
+    const last = Number(state[key] || 0);
+
+    if (queueAlreadyHasActivityKey(key)) return false;
+    if (last && now - last < IMPORTANT_ACTIVITY_DEDUPE_MS) return false;
+
+    state[key] = now;
+    S.lastImportantActivityAt = writeActivityDedupeState(state);
+    return true;
+  }
+
+  function stopActivityDetectionAfterLogout() {
+    if (S.activityTrackingDisabled) return;
+    S.activityTrackingDisabled = true;
+    if (S.activityQueueTimer) clearTimeout(S.activityQueueTimer);
+    if (S.presenceTimer) clearInterval(S.presenceTimer);
+    stopTrackingLoop();
+    stopLocationWatch();
+    stopCamera();
+  }
+
+  function guardActivityAuth() {
+    if (hasActiveAuthToken() && !S.activityTrackingDisabled) return true;
+    stopActivityDetectionAfterLogout();
+    return false;
+  }
 
   async function ensureEmployeeRole() {
     if (localRole) {
@@ -695,12 +954,94 @@
     const sign = offset >= 0 ? '+' : '-';
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(offset / 60)}:${pad(offset % 60)}`;
   }
+  function getActivityQueue() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(ACTIVITY_QUEUE_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+  function setActivityQueue(items) {
+    localStorage.setItem(ACTIVITY_QUEUE_KEY, JSON.stringify(items));
+  }
+  function queueEmployeeActivity(activity, data = {}, options = {}) {
+    if (!guardActivityAuth()) return false;
+    if (!shouldStoreImportantActivity(activity, data, options)) return false;
+    const item = {
+      activity,
+      title: options.title || '',
+      description: options.description || '',
+      attendance_id: options.attendanceId ?? activeAttendanceId(),
+      occurred_at: currentIsoWithOffset(),
+      source: options.source || 'employee_web_dashboard',
+      local_queue_id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+      dedupe_key: options._resolvedDedupeKey || importantActivityDedupeKey(activity, data, options),
+      session_key: S.activitySessionKey,
+      category: options.category || 'attendance_exception',
+      severity: options.severity || 'warn',
+      data: {
+        ...data,
+        page: 'employee_dashboard',
+        work_mode: S.workMode || null,
+        network_type: networkType(),
+        request_ip: S.requestIp || null,
+        location: coordLabel(S.gpsCoords?.lat, S.gpsCoords?.lng, S.gpsCoords?.acc),
+      },
+    };
+    const queue = getActivityQueue();
+    queue.push(item);
+    setActivityQueue(queue.slice(-120));
+    scheduleActivityFlush(options.immediate === true);
+    return true;
+  }
+  function scheduleActivityFlush(immediate = false) {
+    if (!guardActivityAuth()) return;
+    if (S.activityQueueTimer) clearTimeout(S.activityQueueTimer);
+    S.activityQueueTimer = window.setTimeout(() => flushActivityQueue(), immediate ? 100 : ACTIVITY_FLUSH_DELAY_MS);
+  }
+  async function flushActivityQueue(force = false) {
+    if (!guardActivityAuth()) return;
+    if (S.activityFlushBusy || !navigator.onLine) return;
+    const queue = getActivityQueue();
+    if (!queue.length) return;
+    S.activityFlushBusy = true;
+    try {
+      const items = queue.slice(0, force ? queue.length : ACTIVITY_FLUSH_BATCH).map((item) => ({
+        ...item,
+        attendance_id: item.attendance_id ?? S.todayAtt?.id ?? S.activeSession?.id ?? null,
+      }));
+      const res = await API('/api/attendance/mobile/activity-log/sync', {
+        method: 'POST',
+        body: JSON.stringify({ items }),
+      });
+      const json = await res.json();
+      if (res.ok && json.status === 'success') {
+        setActivityQueue(queue.slice(items.length));
+      }
+    } catch (_) {
+      // Keep queue local until a later flush succeeds.
+    } finally {
+      S.activityFlushBusy = false;
+    }
+  }
   async function refreshRequestIp() {
+    if (!guardActivityAuth()) return;
     try {
       const res = await API('/api/attendance/mobile/request-ip');
       const json = await res.json();
       if (res.ok && json?.data?.request_ip) {
+        const previousIp = S.requestIp;
         S.requestIp = json.data.request_ip;
+        const hasActiveAttendance = !!(S.todayAtt?.check_in_time && !S.todayAtt?.check_out_time);
+        if (hasActiveAttendance && previousIp && previousIp !== S.requestIp) {
+          queueEmployeeActivity('request_ip_changed', {
+            attendance_id: activeAttendanceId(),
+            previous_ip: previousIp,
+            current_ip: S.requestIp,
+          }, { title: 'Request IP changed during attendance', severity: 'warn', source: 'employee_web_network', immediate: true });
+        }
+        S.lastLoggedIp = S.requestIp;
       }
     } catch (error) {
       // IP refresh stays non-blocking for the dashboard.
@@ -854,20 +1195,73 @@
       + Math.cos(toRad(Number(lat1))) * Math.cos(toRad(Number(lat2))) * Math.sin(dLng / 2) ** 2;
     return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
   }
+  async function batteryLevel() {
+    if (!navigator.getBattery) return null;
+    try {
+      const battery = await navigator.getBattery();
+      return Number.isFinite(battery?.level) ? Math.round(battery.level * 100) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+  function trackIntervalMs() {
+    return Math.max(30000, Number(S.emp?.continuous_tracking_interval_seconds || 120) * 1000);
+  }
+  function shouldTrackNow() {
+    const att = S.activeSession || S.todayAtt;
+    return !!(att?.id && att?.check_in_time && !att?.check_out_time && toBool(S.emp?.continuous_tracking_enabled));
+  }
+  function shouldSendMovementPing(coords, force = false) {
+    if (!shouldTrackNow() || !coords) return false;
+    if (force || !S.lastTrackSentAt || !S.lastTrackCoords) return true;
+    const elapsed = Date.now() - S.lastTrackSentAt;
+    const moved = distanceMeters(S.lastTrackCoords.lat, S.lastTrackCoords.lng, coords.lat, coords.lng);
+    return elapsed >= trackIntervalMs() || (moved !== null && moved >= 20);
+  }
+  function stopLocationWatch() {
+    if (S.gpsWatchId !== null && navigator.geolocation?.clearWatch) {
+      navigator.geolocation.clearWatch(S.gpsWatchId);
+    }
+    S.gpsWatchId = null;
+  }
+  function applyGpsPosition(position, { triggerTracking = false, forceTracking = false, source = 'employee_web_dashboard' } = {}) {
+    if (!position?.coords) return;
+    S.gpsCoords = {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+      acc: position.coords.accuracy,
+    };
+    setGPS('acquired', `${S.gpsCoords.lat.toFixed(5)}, ${S.gpsCoords.lng.toFixed(5)} (±${Math.round(S.gpsCoords.acc)}m)`);
+    evaluateGeofence();
+    updatePunchBtn();
+    if (triggerTracking && shouldSendMovementPing(S.gpsCoords, forceTracking)) {
+      sendTrackingPing(S.gpsCoords, source, forceTracking);
+    }
+  }
   function evaluateGeofence() {
     const el = document.getElementById('geoHint');
+    let logPayload = null;
+    let logType = null;
+    let logTitle = null;
+    let logSeverity = 'warn';
+
     if (!S.emp) {
       S.geofenceStatus = { blocked: false, tone: 'warn', text: 'Checking branch geofence and work-mode rules…' };
     } else if (S.workMode !== 'office' || !toBool(S.emp.geofence_required)) {
       S.geofenceStatus = { blocked: false, tone: 'ok', text: `Geofence not required for ${S.workMode.toUpperCase()} mode.` };
     } else if (!S.gpsCoords) {
       S.geofenceStatus = { blocked: true, tone: 'warn', text: 'GPS is required to validate office geofence before punch.' };
+      // Do not log a second “geofence unverified” row while GPS is unavailable/acquiring.
+      // The single GPS unavailable record is enough and avoids duplicate rows.
     } else {
       const branchLat = S.emp.branch_latitude !== null && S.emp.branch_latitude !== undefined ? Number(S.emp.branch_latitude) : null;
       const branchLng = S.emp.branch_longitude !== null && S.emp.branch_longitude !== undefined ? Number(S.emp.branch_longitude) : null;
       const radius = S.emp.geofence_radius_meters !== null && S.emp.geofence_radius_meters !== undefined ? Number(S.emp.geofence_radius_meters) : null;
       if (!branchLat || !branchLng || !radius) {
         S.geofenceStatus = { blocked: false, tone: 'warn', text: 'Branch geofence is not configured completely. HR approval may be required.' };
+        logType = 'gps_geofence_unverified';
+        logTitle = 'Branch geofence not configured';
+        logPayload = { attendance_id: activeAttendanceId(), reason: 'branch_geofence_not_configured' };
       } else {
         const dist = distanceMeters(branchLat, branchLng, S.gpsCoords.lat, S.gpsCoords.lng);
         const inside = dist !== null ? dist <= radius : false;
@@ -875,16 +1269,60 @@
         const needsApproval = !inside && toBool(S.emp.outside_location_requires_approval);
         if (inside) {
           S.geofenceStatus = { blocked: false, tone: 'ok', text: `Inside geofence · approx ${Math.round(dist)}m from branch center.` };
+          queueEmployeeActivity('gps_geofence_matched_again', {
+            attendance_id: activeAttendanceId(),
+            distance_meters: Math.round(dist || 0),
+            radius_meters: radius,
+            current_location: coordLabel(S.gpsCoords.lat, S.gpsCoords.lng, S.gpsCoords.acc),
+          }, {
+            title: 'GPS back inside office geofence',
+            severity: 'info',
+            source: 'employee_web_gps',
+            immediate: true,
+          });
         } else if (allowOutside) {
           S.geofenceStatus = { blocked: false, tone: needsApproval ? 'warn' : 'ok', text: `Outside geofence by approx ${Math.round(dist - radius)}m. ${needsApproval ? 'This may go to HR approval.' : 'Allowed by policy.'}` };
+          if (needsApproval) {
+            logType = 'gps_geofence_mismatch';
+            logTitle = 'GPS outside geofence, approval required';
+            logPayload = {
+              attendance_id: activeAttendanceId(),
+              distance_meters: Math.round(dist || 0),
+              outside_by_meters: Math.max(0, Math.round((dist || 0) - radius)),
+              radius_meters: radius,
+              allowed_outside: true,
+              requires_approval: true,
+              current_location: coordLabel(S.gpsCoords.lat, S.gpsCoords.lng, S.gpsCoords.acc),
+            };
+          }
         } else {
           S.geofenceStatus = { blocked: true, tone: 'danger', text: `Outside office geofence by approx ${Math.round(dist - radius)}m. Switch to an allowed mode or move into branch area.` };
+          logType = 'gps_geofence_mismatch';
+          logTitle = 'GPS outside allowed office geofence';
+          logSeverity = 'error';
+          logPayload = {
+            attendance_id: activeAttendanceId(),
+            distance_meters: Math.round(dist || 0),
+            outside_by_meters: Math.max(0, Math.round((dist || 0) - radius)),
+            radius_meters: radius,
+            allowed_outside: false,
+            requires_approval: false,
+            current_location: coordLabel(S.gpsCoords.lat, S.gpsCoords.lng, S.gpsCoords.acc),
+          };
         }
       }
     }
     if (el) {
       el.className = `geo-hint ${S.geofenceStatus.tone}`;
       el.textContent = S.geofenceStatus.text;
+    }
+    if (logType && logPayload) {
+      queueEmployeeActivity(logType, logPayload, {
+        title: logTitle,
+        severity: logSeverity,
+        source: 'employee_web_gps',
+        immediate: true,
+      });
     }
   }
   function selfieRequiredForCurrentPunch() {
@@ -915,15 +1353,53 @@
       S.networkStatus = { blocked: false, tone: 'ok', text: `IP restriction not required for ${S.workMode.toUpperCase()} mode.` };
     } else if (requireIp && !S.requestIp) {
       S.networkStatus = { blocked: true, tone: 'warn', text: 'Current request IP could not be detected yet.' };
+      queueEmployeeActivity('request_ip_missing', {
+        attendance_id: activeAttendanceId(),
+        required_mode: S.workMode,
+        allowed_networks: patterns.map((row) => row.ip_pattern).filter(Boolean),
+      }, { title: 'Request IP missing for office network validation', severity: 'warn', source: 'employee_web_network', immediate: true });
     } else if (requireIp && !matched) {
       const loopbackHint = ['127.0.0.1', '::1'].includes(String(S.requestIp || '').trim())
         ? ' Localhost testing detected, so add 127.0.0.1 or ::1 in branch allowed networks.'
         : '';
       S.networkStatus = { blocked: true, tone: 'danger', text: `Current IP ${S.requestIp || '—'} is not in the allowed branch network list.${loopbackHint}` };
+      queueEmployeeActivity('branch_wifi_ip_mismatch', {
+        attendance_id: activeAttendanceId(),
+        current_ip: S.requestIp || null,
+        network_type: networkType(),
+        connection_type: navigator.connection?.type || null,
+        effective_type: navigator.connection?.effectiveType || null,
+        allowed_networks: patterns.map((row) => row.ip_pattern).filter(Boolean),
+        reason: 'current_ip_not_in_allowed_branch_networks',
+      }, { title: 'Wi-Fi/IP does not match branch network', severity: 'error', source: 'employee_web_network', immediate: true });
     } else if (matchedPattern) {
       S.networkStatus = { blocked: false, tone: 'ok', text: `Approved network matched · ${S.requestIp} → ${matchedPattern}` };
+      queueEmployeeActivity('branch_wifi_ip_matched_again', {
+        attendance_id: activeAttendanceId(),
+        current_ip: S.requestIp || null,
+        matched_pattern: matchedPattern,
+        network_type: networkType(),
+        required_mode: S.workMode,
+      }, {
+        title: 'Wi-Fi/IP verified again',
+        severity: 'info',
+        source: 'employee_web_network',
+        immediate: true,
+      });
     } else {
       S.networkStatus = { blocked: false, tone: 'ok', text: `Current network accepted${S.requestIp ? ` · IP ${S.requestIp}` : ''}` };
+      queueEmployeeActivity('branch_wifi_ip_matched_again', {
+        attendance_id: activeAttendanceId(),
+        current_ip: S.requestIp || null,
+        matched_pattern: null,
+        network_type: networkType(),
+        required_mode: S.workMode,
+      }, {
+        title: 'Network/IP accepted again',
+        severity: 'info',
+        source: 'employee_web_network',
+        immediate: true,
+      });
     }
 
     if (el) {
@@ -942,9 +1418,36 @@
     S.gpsStatus = status;
     document.getElementById('gpsDot').className = 'gps-dot ' + status;
     document.getElementById('gpsText').textContent = text;
+    if (status === 'failed') {
+      queueEmployeeActivity('gps_unavailable', {
+        attendance_id: activeAttendanceId(),
+        gps_status: status,
+        detail: text,
+        gps_required: toBool(S.emp?.gps_required),
+      }, {
+        title: 'GPS unavailable',
+        severity: 'warn',
+        source: 'employee_web_gps',
+        immediate: true,
+      });
+    } else if (status === 'acquired') {
+      queueEmployeeActivity('gps_available_again', {
+        attendance_id: activeAttendanceId(),
+        gps_status: status,
+        detail: text,
+        current_location: coordLabel(S.gpsCoords?.lat, S.gpsCoords?.lng, S.gpsCoords?.acc),
+      }, {
+        title: 'GPS available again',
+        severity: 'info',
+        source: 'employee_web_gps',
+        immediate: true,
+      });
+    }
+    S.lastLoggedGpsState = status;
   }
 
   function startGPS() {
+    if (!guardActivityAuth()) return;
     setGPS('acquiring','Acquiring GPS…');
     if (!navigator.geolocation) {
       setGPS('failed','GPS not supported');
@@ -953,12 +1456,7 @@
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        S.gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
-        setGPS('acquired', `${S.gpsCoords.lat.toFixed(5)}, ${S.gpsCoords.lng.toFixed(5)} (±${Math.round(S.gpsCoords.acc)}m)`);
-        evaluateGeofence();
-        updatePunchBtn();
-      },
+      (pos) => applyGpsPosition(pos),
       () => {
         S.gpsCoords = null;
         setGPS('failed','Could not get GPS — proceeding without location');
@@ -995,6 +1493,12 @@
       evaluateGeofence();
       evaluateNetworkRules();
       updatePunchBtn();
+      queueEmployeeActivity('dashboard_bootstrap_loaded', {
+        employee_code: S.emp?.employee_code || null,
+        branch_name: S.emp?.branch_name || null,
+        shift_name: S.emp?.shift_name || null,
+        tracking_enabled: toBool(S.emp?.continuous_tracking_enabled),
+      }, { title: 'Dashboard bootstrap loaded', source: 'employee_web_dashboard', immediate: true });
     } catch (error) {
       toast('Network error loading profile', 'error');
     }
@@ -1104,12 +1608,19 @@
   }
 
   function setWorkMode(mode) {
+    const previousMode = S.workMode;
     S.workMode = mode;
     document.querySelectorAll('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     updateWfhNote();
     evaluateGeofence();
     evaluateNetworkRules();
     updatePunchBtn();
+    if (previousMode && previousMode !== mode) {
+      queueEmployeeActivity('work_mode_changed', {
+        previous_mode: previousMode,
+        current_mode: mode,
+      }, { title: 'Work mode changed', source: 'employee_web_dashboard' });
+    }
   }
 
   function updateWfhNote() {
@@ -1161,6 +1672,8 @@
   }
 
   async function loadActiveSession(showLoader = true) {
+    if (S.sessionRefreshBusy) return;
+    S.sessionRefreshBusy = true;
     const body = document.getElementById('sessionBody');
     if (showLoader) {
       body.innerHTML = `<div class="emp-table-empty"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading active session…</div>`;
@@ -1179,6 +1692,8 @@
       syncTrackingLoop();
     } catch (error) {
       body.innerHTML = `<div class="emp-table-empty text-danger">${esc(error.message)}</div>`;
+    } finally {
+      S.sessionRefreshBusy = false;
     }
   }
 
@@ -1225,32 +1740,57 @@
 
   function stopTrackingLoop() {
     if (S.trackTimer) clearInterval(S.trackTimer);
+    if (S.trackTimer || S.gpsWatchId !== null) {
+      queueEmployeeActivity('tracking_stopped', {
+        active_attendance_id: S.activeSession?.id || S.todayAtt?.id || null,
+      }, { title: 'Tracking stopped', source: 'employee_web_tracking' });
+    }
     S.trackTimer = null;
     S.trackIntervalSeconds = null;
+    stopLocationWatch();
   }
 
-  async function sendTrackingPing() {
+  async function sendTrackingPing(preferredCoords = null, source = 'employee_web_dashboard', force = false) {
     const att = S.activeSession || S.todayAtt;
     if (S.trackingTickBusy || !navigator.onLine || !att?.id || !att?.check_in_time || att?.check_out_time) return;
     S.trackingTickBusy = true;
     try {
-      const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true });
-      });
+      let coords = preferredCoords;
+      if (!coords && S.gpsCoords) coords = S.gpsCoords;
+      if (!coords) {
+        const position = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000, enableHighAccuracy: true });
+        });
+        coords = { lat: position.coords.latitude, lng: position.coords.longitude, acc: position.coords.accuracy };
+      }
+      if (!coords || (!force && !shouldSendMovementPing(coords, false))) return;
+      const battery = await batteryLevel();
       const payload = {
         attendance_id: att.id,
         recorded_at: currentIsoWithOffset(),
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        gps_accuracy_meters: Math.round(position.coords.accuracy || 0),
+        latitude: coords.lat,
+        longitude: coords.lng,
+        gps_accuracy_meters: Math.round(coords.acc || 0),
+        battery_level: battery,
         network_type: networkType(),
-        source: 'employee_web_dashboard',
+        source,
         sync_status: 'synced',
       };
       const res = await API('/api/attendance/mobile/location-ping', { method:'POST', body:JSON.stringify(payload) });
       const json = await res.json();
       if (res.ok && json.data) {
+        S.gpsCoords = coords;
+        S.lastTrackSentAt = Date.now();
+        S.lastTrackCoords = { lat: Number(coords.lat), lng: Number(coords.lng) };
         S.recentTracks = [json.data, ...S.recentTracks].slice(0, 20);
+        if (S.todayAtt) S.todayAtt.latest_track = json.data;
+        queueEmployeeActivity('movement_tracked', {
+          attendance_id: att.id,
+          source,
+          location: coordLabel(coords.lat, coords.lng, coords.acc),
+          network_type: networkType(),
+        }, { title: 'Movement tracked', source: 'employee_web_tracking' });
+        renderHero();
         renderSession();
       }
     } catch (error) {
@@ -1260,19 +1800,51 @@
     }
   }
 
+  function startLocationWatch() {
+    if (!shouldTrackNow() || S.gpsWatchId !== null || !navigator.geolocation?.watchPosition) return;
+    S.gpsWatchId = navigator.geolocation.watchPosition(
+      (position) => applyGpsPosition(position, { triggerTracking: true, source: 'employee_web_watch' }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    );
+  }
+
   function syncTrackingLoop() {
-    const att = S.activeSession || S.todayAtt;
-    const shouldTrack = !!(att?.check_in_time && !att?.check_out_time && toBool(S.emp?.continuous_tracking_enabled));
-    if (!shouldTrack) {
+    if (!shouldTrackNow()) {
       stopTrackingLoop();
       return;
     }
     const intervalSeconds = Math.max(30, Number(S.emp?.continuous_tracking_interval_seconds || 120));
+    startLocationWatch();
     if (S.trackTimer && S.trackIntervalSeconds === intervalSeconds) return;
     stopTrackingLoop();
+    startLocationWatch();
     S.trackIntervalSeconds = intervalSeconds;
-    sendTrackingPing();
+    queueEmployeeActivity('tracking_started', {
+      interval_seconds: intervalSeconds,
+      attendance_id: S.activeSession?.id || S.todayAtt?.id || null,
+    }, { title: 'Tracking started', source: 'employee_web_tracking' });
+    sendTrackingPing(S.gpsCoords, 'employee_web_interval', true);
     S.trackTimer = window.setInterval(sendTrackingPing, intervalSeconds * 1000);
+  }
+
+  async function refreshLiveSignals(reason = 'manual') {
+    await refreshRequestIp();
+    if (reason !== 'silent') {
+      startGPS();
+    }
+    if (shouldTrackNow()) {
+      await sendTrackingPing(S.gpsCoords, `employee_web_${reason}`, true);
+    }
+    await loadActiveSession(false);
+  }
+
+  function startPresenceLoop() {
+    if (S.presenceTimer) clearInterval(S.presenceTimer);
+    S.presenceTimer = window.setInterval(() => {
+      if (document.hidden) return;
+      refreshLiveSignals('heartbeat');
+    }, 45000);
   }
 
   async function doPunch() {
@@ -1280,6 +1852,10 @@
     const att = S.todayAtt;
     const punchType = (att?.check_in_time && !att?.check_out_time) ? 'check_out' : 'check_in';
     const needSelfie = selfieRequiredForCurrentPunch();
+    queueEmployeeActivity('punch_attempted', {
+      punch_type: punchType,
+      selfie_required: needSelfie,
+    }, { title: `${punchType === 'check_in' ? 'Check-in' : 'Check-out'} attempted`, source: 'employee_web_punch', immediate: true });
 
     if (toBool(S.emp?.device_binding_required) && !S.deviceId) {
       toast('Device identity is required before attendance punch.', 'error');
@@ -1301,10 +1877,23 @@
       return;
     }
     if (S.geofenceStatus?.blocked) {
+      queueEmployeeActivity('punch_blocked_geofence', {
+        attendance_id: activeAttendanceId(),
+        punch_type: punchType,
+        reason: S.geofenceStatus.text || 'Geofence blocked punch',
+        current_location: coordLabel(S.gpsCoords?.lat, S.gpsCoords?.lng, S.gpsCoords?.acc),
+      }, { title: 'Punch blocked by geofence', severity: 'error', source: 'employee_web_punch', immediate: true });
       toast(S.geofenceStatus.text || 'You are outside the allowed geofence.', 'error');
       return;
     }
     if (S.networkStatus?.blocked) {
+      queueEmployeeActivity('punch_blocked_network', {
+        attendance_id: activeAttendanceId(),
+        punch_type: punchType,
+        reason: S.networkStatus.text || 'Network/IP policy blocked punch',
+        current_ip: S.requestIp || null,
+        network_type: networkType(),
+      }, { title: 'Punch blocked by Wi-Fi/IP policy', severity: 'error', source: 'employee_web_punch', immediate: true });
       toast(S.networkStatus.text || 'Current network or IP does not satisfy policy.', 'error');
       return;
     }
@@ -1345,20 +1934,38 @@
       const res = await API('/api/attendance/mobile/punch', { method:'POST', body:payload });
       const json = await res.json();
       if (!res.ok || json.status === 'error') {
+        queueEmployeeActivity('punch_failed', {
+          punch_type: punchType,
+          reason: json.message || 'Punch failed',
+        }, { title: 'Punch failed', severity: 'error', source: 'employee_web_punch', immediate: true });
         toast(json.message || 'Punch failed', 'error');
       } else {
         S.todayAtt = json.data?.attendance || S.todayAtt;
         clearSelfiePreview();
         renderHero();
         await loadActiveSession(false);
+        queueEmployeeActivity('punch_captured', {
+          punch_type: punchType,
+          approval_status: json.data?.approval_status || null,
+          exceptions: json.data?.exceptions || [],
+        }, { title: 'Punch captured', source: 'employee_web_punch', immediate: true });
         toast(json.message || ((punchType === 'check_in' ? 'Checked in' : 'Checked out') + ' successfully'), 'success');
         if (json.data?.exceptions?.length) {
+          queueEmployeeActivity('attendance_flagged_for_review', {
+            punch_type: punchType,
+            exceptions: json.data.exceptions,
+          }, { title: 'Attendance flagged for review', severity: 'warn', source: 'employee_web_punch', immediate: true });
           toast(`⚠️ ${json.data.exceptions.join(', ')} — sent for HR review.`, 'info', 7000);
         }
         loadSummary(document.getElementById('statsMonth').value);
         loadSyncQueue();
+        flushActivityQueue(true);
       }
     } catch (error) {
+      queueEmployeeActivity('punch_failed', {
+        punch_type: punchType,
+        reason: 'Network error',
+      }, { title: 'Punch failed', severity: 'error', source: 'employee_web_punch', immediate: true });
       toast('Network error. Try again.', 'error');
     } finally {
       S.punchInProgress = false;
@@ -1442,21 +2049,70 @@
 
   document.getElementById('syncRefresh').addEventListener('click', loadSyncQueue);
   document.getElementById('sessionRefresh').addEventListener('click', () => loadActiveSession(true));
-  window.addEventListener('online', async () => {
-    await refreshRequestIp();
-    loadSyncQueue();
-    loadActiveSession(false);
+
+  document.addEventListener('click', (event) => {
+    const logoutTrigger = event.target.closest('[data-logout], #logoutBtn, .logout-btn, .js-logout, a[href*="logout"], button[onclick*="logout"]');
+    if (logoutTrigger) stopActivityDetectionAfterLogout();
+  }, true);
+
+  window.addEventListener('storage', (event) => {
+    if (['token', 'role'].includes(event.key) && !hasActiveAuthToken()) {
+      stopActivityDetectionAfterLogout();
+    }
   });
-  window.addEventListener('beforeunload', () => { stopTrackingLoop(); stopCamera(); });
+
+  window.addEventListener('online', async () => {
+    if (!guardActivityAuth()) return;
+    queueEmployeeActivity('network_online', {}, { title: 'Internet connected', source: 'employee_web_network', immediate: true });
+    await refreshLiveSignals('online');
+    loadSyncQueue();
+    flushActivityQueue(true);
+  });
+  window.addEventListener('offline', () => {
+    if (!guardActivityAuth()) return;
+    queueEmployeeActivity('network_offline', {}, { title: 'Internet disconnected', severity: 'warn', source: 'employee_web_network', immediate: true });
+  });
+  window.addEventListener('focus', () => {
+    if (!guardActivityAuth()) return;
+    refreshLiveSignals('focus');
+  });
+  window.addEventListener('pageshow', () => {
+    if (!guardActivityAuth()) return;
+    refreshLiveSignals('pageshow');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (!guardActivityAuth()) return;
+    queueEmployeeActivity(document.hidden ? 'dashboard_hidden' : 'dashboard_visible', {}, {
+      title: document.hidden ? 'Dashboard hidden' : 'Dashboard visible',
+      source: 'employee_web_dashboard',
+    });
+    if (!document.hidden) {
+      refreshLiveSignals('visible');
+      flushActivityQueue(true);
+    }
+  });
+  navigator.connection?.addEventListener?.('change', () => {
+    if (!guardActivityAuth()) return;
+    refreshRequestIp();
+    if (shouldTrackNow()) sendTrackingPing(S.gpsCoords, 'employee_web_network_change', true);
+  });
+  window.addEventListener('beforeunload', () => {
+    if (S.presenceTimer) clearInterval(S.presenceTimer);
+    stopTrackingLoop();
+    stopLocationWatch();
+    stopCamera();
+  });
 
   ensureEmployeeRole().then((allowed) => {
-    if (!allowed) return;
+    if (!allowed || !guardActivityAuth()) return;
     startGPS();
     loadBootstrap().then(async () => {
       await refreshRequestIp();
       loadSummary(statsMonthInput.value);
       loadActiveSession();
       loadSyncQueue();
+      startPresenceLoop();
+      flushActivityQueue(true);
     });
   });
 })();

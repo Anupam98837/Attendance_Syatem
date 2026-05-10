@@ -254,6 +254,53 @@ trait InteractsWithAttendance
         return [$date, $start, $end];
     }
 
+    protected function normalizeCarbonValue($value): ?Carbon
+    {
+        if (!$value) {
+            return null;
+        }
+
+        if ($value instanceof Carbon) {
+            return $value->copy();
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    protected function normalizedCheckOut(?Carbon $checkIn, ?Carbon $checkOut, $allowCrossDay = false): ?Carbon
+    {
+        if (!$checkIn || !$checkOut) {
+            return $checkOut;
+        }
+
+        if ($checkOut->lessThan($checkIn)) {
+            return $checkOut->copy()->addDay();
+        }
+
+        return $checkOut;
+    }
+
+    protected function calculateWorkingMinutesFromTimes($checkInValue, $checkOutValue, int $breakMinutes = 0, $allowCrossDay = false): ?int
+    {
+        $checkIn = $this->normalizeCarbonValue($checkInValue);
+        $checkOut = $this->normalizeCarbonValue($checkOutValue);
+
+        if (!$checkIn || !$checkOut) {
+            return null;
+        }
+
+        $checkOut = $this->normalizedCheckOut($checkIn, $checkOut, $allowCrossDay);
+        if (!$checkOut || $checkOut->lessThan($checkIn)) {
+            return null;
+        }
+
+        return max(0, $checkIn->diffInMinutes($checkOut) - max(0, $breakMinutes));
+    }
+
     protected function recalculateAttendanceRecord(int $recordId, object $employee, ?string $forcedApprovalStatus = null): ?object
     {
         $record = DB::table('employee_attendance')->where('id', $recordId)->first();
@@ -268,9 +315,14 @@ trait InteractsWithAttendance
             $employee->allow_cross_day
         );
 
-        $checkIn = !empty($record->check_in_time) ? Carbon::parse($record->check_in_time) : null;
-        $checkOut = !empty($record->check_out_time) ? Carbon::parse($record->check_out_time) : null;
+        $checkIn = $this->normalizeCarbonValue($record->check_in_time ?? null);
+        $checkOut = $this->normalizedCheckOut(
+            $checkIn,
+            $this->normalizeCarbonValue($record->check_out_time ?? null),
+            $employee->allow_cross_day
+        );
         $approvalStatus = $forcedApprovalStatus ?? ($record->approval_status ?: 'approved');
+        $breakMinutes = (int) ($record->break_minutes ?? $employee->break_minutes ?? 0);
 
         $lateMinutes = null;
         if ($checkIn && $shiftStart) {
@@ -288,7 +340,7 @@ trait InteractsWithAttendance
         $overtimeMinutes = null;
 
         if ($checkIn && $checkOut && $checkOut->greaterThanOrEqualTo($checkIn)) {
-            $workedMinutes = max(0, $checkIn->diffInMinutes($checkOut) - (int) ($employee->break_minutes ?? 0));
+            $workedMinutes = $this->calculateWorkingMinutesFromTimes($checkIn, $checkOut, $breakMinutes, $employee->allow_cross_day);
 
             if ($shiftEnd && $checkOut->lessThan($shiftEnd)) {
                 $earlyCheckoutMinutes = $checkOut->diffInMinutes($shiftEnd);
@@ -330,6 +382,7 @@ trait InteractsWithAttendance
             'total_working_minutes' => $workedMinutes,
             'early_checkout_minutes' => $earlyCheckoutMinutes,
             'overtime_minutes' => $overtimeMinutes,
+            'break_minutes' => $breakMinutes ?: null,
             'status' => $status,
             'approval_status' => $approvalStatus,
             'updated_at' => now(),
