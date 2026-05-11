@@ -618,24 +618,58 @@
             </select>
           </div>
 
-          <div class="col-md-6 js-pw-section">
-            <label class="form-label">Password <span class="text-danger">*</span></label>
-            <div class="u-pw-wrap">
-              <input type="password" class="form-control pe-5" id="userPassword" placeholder="••••••••">
-              <button type="button" class="u-eye js-eye-toggle" data-target="userPassword" aria-label="Toggle password visibility">
-                <i class="fa-regular fa-eye-slash"></i>
-              </button>
+          {{-- Password fields (always shown for create; collapsed toggle for edit) --}}
+          <div class="col-12 js-pw-section">
+            <div id="pwCreateFields" class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Password <span class="text-danger">*</span></label>
+                <div class="u-pw-wrap">
+                  <input type="password" class="form-control pe-5" id="userPassword" placeholder="Min 8 characters">
+                  <button type="button" class="u-eye js-eye-toggle" data-target="userPassword" aria-label="Toggle password">
+                    <i class="fa-regular fa-eye-slash"></i>
+                  </button>
+                </div>
+                <div class="form-text">Required for new users (min 8 characters).</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
+                <div class="u-pw-wrap">
+                  <input type="password" class="form-control pe-5" id="userPasswordConfirmation" placeholder="Repeat password">
+                  <button type="button" class="u-eye js-eye-toggle" data-target="userPasswordConfirmation" aria-label="Toggle confirm password">
+                    <i class="fa-regular fa-eye-slash"></i>
+                  </button>
+                </div>
+              </div>
             </div>
-            <div class="form-text">Password for new user (min 8 characters).</div>
-          </div>
 
-          <div class="col-md-6 js-pw-section">
-            <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
-            <div class="u-pw-wrap">
-              <input type="password" class="form-control pe-5" id="userPasswordConfirmation" placeholder="••••••••">
-              <button type="button" class="u-eye js-eye-toggle" data-target="userPasswordConfirmation" aria-label="Toggle confirm password visibility">
-                <i class="fa-regular fa-eye-slash"></i>
+            {{-- Change-password toggle (only visible in edit mode) --}}
+            <div id="pwEditToggleWrap" style="display:none;">
+              <button type="button" id="pwEditToggleBtn" class="btn btn-sm btn-outline-primary" style="border-radius:10px;">
+                <i class="fa fa-key me-1"></i> Change Password
               </button>
+              <div id="pwEditFields" style="display:none;margin-top:14px;" class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">New Password</label>
+                  <div class="u-pw-wrap">
+                    <input type="password" class="form-control pe-5" id="userNewPassword" placeholder="Min 8 characters">
+                    <button type="button" class="u-eye js-eye-toggle" data-target="userNewPassword" aria-label="Toggle password">
+                      <i class="fa-regular fa-eye-slash"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Confirm New Password</label>
+                  <div class="u-pw-wrap">
+                    <input type="password" class="form-control pe-5" id="userNewPasswordConfirmation" placeholder="Repeat password">
+                    <button type="button" class="u-eye js-eye-toggle" data-target="userNewPasswordConfirmation" aria-label="Toggle confirm password">
+                      <i class="fa-regular fa-eye-slash"></i>
+                    </button>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="form-text"><i class="fa fa-circle-info me-1 text-primary"></i>Leave blank to keep the existing password.</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -815,8 +849,27 @@ document.addEventListener('DOMContentLoaded', function(){
   const userPhoneInput = document.getElementById('userPhone');
   const userRoleInput  = document.getElementById('userRole');
   const userStatusInput= document.getElementById('userStatus');
-  const userPasswordInput  = document.getElementById('userPassword');
-  const userPassword2Input = document.getElementById('userPasswordConfirmation');
+  const userPasswordInput      = document.getElementById('userPassword');
+  const userPassword2Input     = document.getElementById('userPasswordConfirmation');
+  const userNewPasswordInput   = document.getElementById('userNewPassword');
+  const userNewPassword2Input  = document.getElementById('userNewPasswordConfirmation');
+  const pwCreateFields         = document.getElementById('pwCreateFields');
+  const pwEditToggleWrap       = document.getElementById('pwEditToggleWrap');
+  const pwEditToggleBtn        = document.getElementById('pwEditToggleBtn');
+  const pwEditFields           = document.getElementById('pwEditFields');
+
+  let pwEditOpen = false;
+  pwEditToggleBtn?.addEventListener('click', () => {
+    pwEditOpen = !pwEditOpen;
+    pwEditFields.style.display = pwEditOpen ? '' : 'none';
+    pwEditToggleBtn.innerHTML = pwEditOpen
+      ? '<i class="fa fa-xmark me-1"></i> Cancel Password Change'
+      : '<i class="fa fa-key me-1"></i> Change Password';
+    if (!pwEditOpen) {
+      userNewPasswordInput.value = '';
+      userNewPassword2Input.value = '';
+    }
+  });
   const userAltEmailInput  = document.getElementById('userAltEmail');
   const userAltPhoneInput  = document.getElementById('userAltPhone');
   const userWhatsAppInput  = document.getElementById('userWhatsApp');
@@ -1299,12 +1352,21 @@ document.addEventListener('DOMContentLoaded', function(){
     imagePreview.removeAttribute('src');
     userImageInput.value = '';
     pwSections.forEach(el => el.style.display = '');
+    // Reset password toggle state
+    pwEditOpen = false;
+    if (pwEditFields) pwEditFields.style.display = 'none';
+    if (pwEditToggleBtn) pwEditToggleBtn.innerHTML = '<i class="fa fa-key me-1"></i> Change Password';
+    if (userNewPasswordInput) userNewPasswordInput.value = '';
+    if (userNewPassword2Input) userNewPassword2Input.value = '';
   }
 
   function openCreateModal(){
     resetForm();
     userModalTitle.textContent = 'Add User';
     saveUserBtn.innerHTML = '<i class="fa fa-floppy-disk me-1"></i> Save';
+    // Create mode: show create fields, hide edit toggle
+    if (pwCreateFields) pwCreateFields.style.display = '';
+    if (pwEditToggleWrap) pwEditToggleWrap.style.display = 'none';
     userPasswordInput.required = true;
     userPassword2Input.required = true;
     userModal.show();
@@ -1335,7 +1397,9 @@ document.addEventListener('DOMContentLoaded', function(){
         imagePreview.style.display = 'block';
       }
 
-      pwSections.forEach(el => el.style.display = 'none');
+      // Edit mode: hide create fields, show change-password toggle
+      if (pwCreateFields) pwCreateFields.style.display = 'none';
+      if (pwEditToggleWrap) pwEditToggleWrap.style.display = '';
       userPasswordInput.required = false;
       userPassword2Input.required = false;
 
@@ -1557,6 +1621,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if (userRoleInput.value) fd.append('role', userRoleInput.value);
     if (userStatusInput.value) fd.append('status', userStatusInput.value);
     if (!isEdit){
+      // Create mode — password required
       if (!userPasswordInput.value.trim() || userPasswordInput.value.trim().length < 8){
         return err('Password must be at least 8 characters');
       }
@@ -1564,6 +1629,16 @@ document.addEventListener('DOMContentLoaded', function(){
         return err('Passwords do not match');
       }
       fd.append('password', userPasswordInput.value);
+    } else if (pwEditOpen) {
+      // Edit mode — password change is optional; only validate if toggle is open
+      const np  = userNewPasswordInput?.value.trim() || '';
+      const np2 = userNewPassword2Input?.value.trim() || '';
+      if (np.length > 0) {
+        if (np.length < 8) return err('New password must be at least 8 characters');
+        if (np !== np2)   return err('New passwords do not match');
+        fd.append('password', np);
+        fd.append('password_confirmation', np2);
+      }
     }
 
     if (userImageInput.files && userImageInput.files[0]){

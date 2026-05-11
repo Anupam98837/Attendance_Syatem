@@ -1047,6 +1047,18 @@ class UserController extends Controller
             $updates['image'] = $newUrl;
         }
 
+        // Optional inline password change from the edit form
+        if ($request->filled('password')) {
+            $pwVal = Validator::make($request->only('password', 'password_confirmation'), [
+                'password'              => 'required|string|min:8',
+                'password_confirmation' => 'nullable|string|same:password',
+            ]);
+            if ($pwVal->fails()) {
+                return response()->json(['status' => 'error', 'errors' => $pwVal->errors()], 422);
+            }
+            $updates['password'] = Hash::make((string) $request->input('password'));
+        }
+
         if (empty($updates)) {
             return response()->json(['status' => 'error', 'message' => 'Nothing to update'], 400);
         }

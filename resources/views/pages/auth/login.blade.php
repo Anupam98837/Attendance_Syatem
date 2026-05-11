@@ -3,651 +3,507 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Login - Attendance System</title>
+  <title>Sign In — Attendance System</title>
   <meta name="csrf-token" content="{{ csrf_token() }}"/>
-
   <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('assets/media/images/web/favicon.png') }}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet"/>
-  <link rel="stylesheet" href="{{ asset('/assets/css/main.css') }}"/>
 
   <style>
-    :root{
-      --ux-bg:#f5f5ef;
-      --ux-surface:#ffffff;
-      --ux-ink:#1f352e;
-      --ux-copy:#6b7b73;
-      --ux-line:rgba(31,53,46,.10);
-      --ux-primary:#0f766e;
-      --ux-secondary:#d97706;
-      --ux-dark:#12352f;
-      --ux-radius-xl:32px;
-      --ux-radius-lg:24px;
-      --ux-radius-md:18px;
-      --ux-shadow:0 24px 60px rgba(15,49,77,.10);
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --primary:   #0ea5e9;
+      --accent:    #2563eb;
+      --ink:       #102a6a;
+      --body-text: #10213f;
+      --muted:     #5b6b8c;
+      --bg:        #eef6ff;
+      --surface:   #ffffff;
+      --surface-2: #f3f8ff;
+      --border:    #dbe9ff;
+      --border-md: #bfd5f8;
+      --shadow-1:  0 1px 3px rgba(30,58,138,.08), 0 1px 2px rgba(30,58,138,.04);
+      --shadow-2:  0 4px 16px rgba(30,58,138,.10), 0 2px 6px rgba(30,58,138,.06);
+      --shadow-3:  0 16px 40px rgba(15,23,42,.12), 0 4px 12px rgba(15,23,42,.06);
+      --ring:      0 0 0 3px rgba(37,99,235,.18);
+      --r-md:      14px;
+      --r-lg:      20px;
+      --r-xl:      26px;
     }
 
-    *{box-sizing:border-box}
-
-    body.ux-auth-body{
-      margin:0;
-      min-height:100vh;
-      font-family:"DM Sans",sans-serif;
-      color:var(--ux-ink);
-      background:
-        radial-gradient(circle at top left, rgba(15,118,110,.08), transparent 18%),
-        radial-gradient(circle at bottom right, rgba(217,119,6,.10), transparent 22%),
-        linear-gradient(180deg,#fbfdff 0%, var(--ux-bg) 100%);
+    html, body {
+      height: 100%;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--body-text);
     }
 
-    .ux-auth{
-      min-height:100vh;
-      display:grid;
-      grid-template-columns:minmax(320px,.95fr) minmax(320px,.85fr);
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
     }
 
-    .ux-brand-side{
-      background:linear-gradient(160deg, #15322e 0%, #0f766e 58%, #d97706 100%);
-      color:#fff;
-      padding:clamp(28px,5vw,56px);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      position:relative;
-      overflow:hidden;
+    /* ── Card ───────────────────────────────────────────── */
+    .auth-card {
+      width: min(420px, 100%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r-xl);
+      box-shadow: var(--shadow-3);
+      padding: 40px 36px 36px;
+      animation: fadeUp .3s ease both;
     }
 
-    .ux-brand-side::before,
-    .ux-brand-side::after{
-      content:"";
-      position:absolute;
-      border-radius:50%;
-      opacity:.16;
-      pointer-events:none;
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
-    .ux-brand-side::before{
-      width:260px;
-      height:260px;
-      top:-80px;
-      right:-70px;
-      background:radial-gradient(circle, #fff 0%, transparent 70%);
+    /* ── Brand header ───────────────────────────────────── */
+    .auth-brand {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 32px;
     }
 
-    .ux-brand-side::after{
-      width:240px;
-      height:240px;
-      left:-70px;
-      bottom:-90px;
-      background:radial-gradient(circle, #ffe38c 0%, transparent 72%);
+    .auth-logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      background: #fff;
+      border: 1px solid var(--border);
+      display: grid;
+      place-items: center;
+      margin-bottom: 14px;
+      box-shadow: 0 4px 16px rgba(30,58,138,.10);
+      overflow: hidden;
     }
 
-    .ux-brand-inner{
-      position:relative;
-      z-index:1;
-      width:min(440px,100%);
+    .auth-logo img {
+      width: 52px;
+      height: 52px;
+      object-fit: contain;
     }
 
-    .ux-brand-head{
-      display:flex;
-      align-items:center;
-      gap:14px;
-      margin-bottom:28px;
+    .auth-logo i {
+      font-size: 26px;
+      color: var(--accent);
     }
 
-    .ux-brand-mark{
-      width:64px;
-      height:64px;
-      border-radius:20px;
-      display:grid;
-      place-items:center;
-      background:rgba(255,255,255,.14);
-      border:1px solid rgba(255,255,255,.18);
-      backdrop-filter:blur(10px);
-      flex-shrink:0;
+    .auth-app-name {
+      font-family: 'Poppins', sans-serif;
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 6px;
     }
 
-    .ux-brand-mark img{
-      width:40px;
-      height:40px;
-      object-fit:contain;
+    .auth-title {
+      font-family: 'Poppins', sans-serif;
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: -.02em;
+      line-height: 1.15;
     }
 
-    .ux-brand-copy strong{
-      display:block;
-      font-family:"Space Grotesk",sans-serif;
-      font-size:1.15rem;
-      letter-spacing:-.03em;
+    .auth-sub {
+      margin-top: 6px;
+      font-size: .875rem;
+      color: var(--muted);
+      line-height: 1.55;
     }
 
-    .ux-brand-copy span{
-      display:block;
-      margin-top:4px;
-      color:rgba(255,255,255,.72);
-      font-size:.92rem;
+    /* ── Alert ──────────────────────────────────────────── */
+    .auth-alert {
+      display: none;
+      align-items: center;
+      gap: 9px;
+      padding: 11px 14px;
+      border-radius: var(--r-md);
+      font-size: .855rem;
+      font-weight: 500;
+      line-height: 1.45;
+      margin-bottom: 20px;
+    }
+    .auth-alert.show { display: flex; }
+    .auth-alert.err  { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; }
+    .auth-alert.ok   { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+
+    /* ── Fields ─────────────────────────────────────────── */
+    .auth-field { margin-bottom: 16px; }
+
+    .auth-label {
+      display: block;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 7px;
     }
 
-    .ux-kicker{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:10px 14px;
-      border-radius:999px;
-      background:rgba(255,255,255,.12);
-      border:1px solid rgba(255,255,255,.14);
-      font-size:.78rem;
-      font-weight:700;
-      letter-spacing:.05em;
-      text-transform:uppercase;
+    .auth-input-wrap { position: relative; }
+
+    .auth-input-wrap .icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--border-md);
+      font-size: .85rem;
+      pointer-events: none;
+      transition: color .15s;
     }
 
-    .ux-brand-title{
-      margin:18px 0 12px;
-      font-family:"Space Grotesk",sans-serif;
-      font-size:clamp(2rem,4.6vw,3.4rem);
-      line-height:1.02;
-      letter-spacing:-.05em;
-      max-width:10ch;
+    .auth-input-wrap:focus-within .icon {
+      color: var(--accent);
     }
 
-    .ux-brand-text{
-      margin:0;
-      max-width:34ch;
-      color:rgba(255,255,255,.78);
-      line-height:1.75;
-      font-size:1rem;
+    .auth-input {
+      width: 100%;
+      height: 46px;
+      border: 1px solid var(--border-md);
+      border-radius: var(--r-md);
+      background: var(--surface-2);
+      color: var(--body-text);
+      font-family: inherit;
+      font-size: .92rem;
+      padding: 0 14px 0 40px;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+      -webkit-appearance: none;
     }
 
-    .ux-brand-pills{
-      margin-top:24px;
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
+    .auth-input::placeholder { color: #a8bbd9; }
+
+    .auth-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--surface);
+      box-shadow: var(--ring);
     }
 
-    .ux-brand-pills span{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      padding:10px 12px;
-      border-radius:999px;
-      background:rgba(9,24,37,.16);
-      border:1px solid rgba(255,255,255,.12);
-      font-size:.88rem;
+    .auth-input.has-eye { padding-right: 44px; }
+
+    .eye-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      border: 0;
+      background: transparent;
+      color: var(--border-md);
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: color .15s;
+    }
+    .eye-btn:hover { color: var(--muted); }
+
+    /* ── Row: remember + forgot ─────────────────────────── */
+    .auth-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 4px 0 22px;
+      gap: 8px;
     }
 
-    .ux-form-side{
-      padding:clamp(20px,4vw,42px);
-      display:flex;
-      align-items:center;
-      justify-content:center;
+    .auth-check-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: .855rem;
+      color: var(--muted);
+      cursor: pointer;
+      user-select: none;
     }
 
-    .ux-form-shell{
-      width:min(420px,100%);
+    .auth-check {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
     }
 
-    .ux-topline{
-      display:flex;
-      justify-content:flex-end;
-      margin-bottom:16px;
+    .auth-link {
+      font-size: .855rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .auth-link:hover { color: var(--primary); }
+
+    /* ── Submit ─────────────────────────────────────────── */
+    .auth-btn {
+      width: 100%;
+      height: 48px;
+      border: 0;
+      border-radius: var(--r-md);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      color: #fff;
+      font-family: inherit;
+      font-size: .94rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(37,99,235,.28);
+      transition: transform .15s ease, box-shadow .15s ease, filter .15s;
+      letter-spacing: .01em;
     }
 
-    .ux-topline a{
-      color:var(--ux-copy);
-      text-decoration:none;
-      font-weight:700;
+    .auth-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 22px rgba(37,99,235,.36);
+      filter: brightness(1.05);
     }
 
-    .ux-card{
-      padding:30px;
-      border-radius:var(--ux-radius-xl);
-      background:rgba(255,255,255,.86);
-      border:1px solid rgba(255,255,255,.8);
-      box-shadow:var(--ux-shadow);
-      backdrop-filter:blur(10px);
+    .auth-btn:active:not(:disabled) {
+      transform: translateY(0);
+      box-shadow: 0 4px 14px rgba(37,99,235,.28);
     }
 
-    .ux-card-title{
-      margin:0 0 8px;
-      font-family:"Space Grotesk",sans-serif;
-      font-size:2rem;
-      letter-spacing:-.05em;
-      line-height:1.02;
+    .auth-btn:disabled {
+      opacity: .7;
+      cursor: not-allowed;
     }
 
-    .ux-card-copy{
-      margin:0 0 22px;
-      color:var(--ux-copy);
-      line-height:1.68;
-      font-size:.95rem;
+    /* ── Footer ─────────────────────────────────────────── */
+    .auth-footer {
+      margin-top: 22px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
     }
 
-    .ux-alert{
-      margin-bottom:16px;
-      border-radius:16px;
-      border:0;
-      font-size:.92rem;
+    .auth-footer-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: .8rem;
+      color: #a8bbd9;
     }
 
-    .ux-field{
-      margin-bottom:16px;
+    .auth-footer-item i { font-size: .72rem; color: var(--primary); }
+
+    /* ── Page footer ────────────────────────────────────── */
+    .page-foot {
+      margin-top: 20px;
+      font-size: .8rem;
+      color: #a8bbd9;
+      text-align: center;
     }
+    .page-foot a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    .page-foot a:hover { color: var(--primary); }
 
-    .ux-label{
-      display:block;
-      margin-bottom:8px;
-      font-size:.9rem;
-      font-weight:700;
-      color:var(--ux-ink);
-    }
-
-    .ux-input-wrap{
-      position:relative;
-    }
-
-    .ux-field-icon{
-      position:absolute;
-      left:15px;
-      top:50%;
-      transform:translateY(-50%);
-      color:#88a0b2;
-      font-size:.92rem;
-      pointer-events:none;
-    }
-
-    .ux-control{
-      width:100%;
-      min-height:52px;
-      border-radius:18px;
-      border:1px solid var(--ux-line);
-      background:#fbfdff;
-      color:var(--ux-ink);
-      padding:14px 16px 14px 44px;
-      font-size:.96rem;
-      transition:border-color .18s ease, box-shadow .18s ease;
-    }
-
-    .ux-control:focus{
-      outline:none;
-      border-color:rgba(14,122,196,.34);
-      box-shadow:0 0 0 4px rgba(14,122,196,.10);
-      background:#fff;
-    }
-
-    .ux-control::placeholder{
-      color:#9ab0bf;
-    }
-
-    .ux-control.with-eye{
-      padding-right:52px;
-    }
-
-    .ux-eye{
-      position:absolute;
-      top:50%;
-      right:10px;
-      transform:translateY(-50%);
-      width:36px;
-      height:36px;
-      border:0;
-      border-radius:12px;
-      background:transparent;
-      color:#88a0b2;
-      display:grid;
-      place-items:center;
-      cursor:pointer;
-    }
-
-    .ux-row{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      flex-wrap:wrap;
-      margin:2px 0 18px;
-    }
-
-    .ux-row a{
-      color:var(--ux-primary);
-      text-decoration:none;
-      font-weight:700;
-    }
-
-    .ux-login{
-      width:100%;
-      min-height:54px;
-      border:0;
-      border-radius:18px;
-      background:linear-gradient(135deg,var(--ux-primary) 0%, #1b98ea 55%, var(--ux-secondary) 100%);
-      color:#fff;
-      font-weight:700;
-      font-size:.98rem;
-      box-shadow:0 16px 30px rgba(14,122,196,.18);
-      transition:transform .18s ease, filter .18s ease;
-    }
-
-    .ux-login:hover{
-      transform:translateY(-1px);
-      filter:brightness(.99);
-    }
-
-    .ux-footer{
-      margin-top:18px;
-      text-align:center;
-      color:var(--ux-copy);
-      font-size:.93rem;
-    }
-
-    .ux-footer a{
-      color:var(--ux-primary);
-      text-decoration:none;
-      font-weight:700;
-    }
-
-    @media (max-width: 920px){
-      .ux-auth{
-        grid-template-columns:1fr;
-      }
-
-      .ux-brand-side{
-        min-height:auto;
-        padding:24px 20px;
-      }
-
-      .ux-brand-inner{
-        width:100%;
-      }
-
-      .ux-brand-title{
-        max-width:none;
-        font-size:2rem;
-      }
-
-      .ux-brand-text{
-        max-width:none;
-      }
-    }
-
-    @media (max-width: 576px){
-      .ux-form-side{
-        padding:16px;
-      }
-
-      .ux-card{
-        padding:22px 18px;
-        border-radius:24px;
-      }
-
-      .ux-brand-side{
-        padding:20px 16px 18px;
-      }
-
-      .ux-brand-head{
-        margin-bottom:18px;
-      }
-
-      .ux-brand-mark{
-        width:54px;
-        height:54px;
-        border-radius:18px;
-      }
-
-      .ux-brand-mark img{
-        width:32px;
-        height:32px;
-      }
-
-      .ux-brand-title{
-        font-size:1.72rem;
-      }
-
-      .ux-brand-text{
-        font-size:.93rem;
-      }
-
-      .ux-brand-pills{
-        margin-top:18px;
-      }
+    @media (max-width: 480px) {
+      .auth-card { padding: 28px 20px 24px; border-radius: var(--r-lg); }
     }
   </style>
 </head>
-<body class="ux-auth-body">
-<div class="ux-auth">
-  <aside class="ux-brand-side">
-    <div class="ux-brand-inner">
-      <div class="ux-brand-head">
-        <div class="ux-brand-mark">
-          <img src="{{ asset('/assets/media/images/web/logo.png') }}" alt="Attendance System">
-        </div>
-        <div class="ux-brand-copy">
-          <strong>Attendance System</strong>
-          <span>Employee workspace access</span>
-        </div>
-      </div>
+<body>
 
-      <span class="ux-kicker"><i class="fa-solid fa-shield-check"></i> Secure Login</span>
-      <h1 class="ux-brand-title">Sign in to your attendance workspace.</h1>
-      <p class="ux-brand-text">Use your registered email or phone number to access attendance operations, user management, and role-based tools.</p>
+  <div class="auth-card">
 
-      <div class="ux-brand-pills">
-        <span><i class="fa-solid fa-check"></i> Role based access</span>
-        <span><i class="fa-solid fa-check"></i> Shared admin shell</span>
-      </div>
+    <!-- Brand -->
+    <div class="auth-brand">
+      <div class="auth-logo">
+      <img id="logo" src="{{ asset('/assets/media/images/web/logo.png') }}" alt="Attendance System">
     </div>
-  </aside>
+      <div class="auth-app-name">Attendance System</div>
+      <div class="auth-title">Sign in to your account</div>
+      <div class="auth-sub">Enter your credentials to continue</div>
+    </div>
 
-  <main class="ux-form-side">
-    <div class="ux-form-shell">
-      <div class="ux-topline">
-        <a href="/dashboard">Go to Dashboard</a>
+    <!-- Alert -->
+    <div id="a_alert" class="auth-alert" role="alert">
+      <i id="a_icon" class="fa-solid fa-circle-exclamation fa-sm"></i>
+      <span id="a_msg"></span>
+    </div>
+
+    <!-- Form -->
+    <form id="a_form" novalidate>
+      @csrf
+
+      <div class="auth-field">
+        <label class="auth-label" for="a_id">Email or Phone Number</label>
+        <div class="auth-input-wrap">
+          <i class="icon fa-solid fa-at"></i>
+          <input id="a_id" type="text" class="auth-input" name="identifier"
+                 placeholder="you@example.com" autocomplete="username" required>
+        </div>
       </div>
 
-      <section class="ux-card">
-        <h2 class="ux-card-title">Welcome back</h2>
-        <p class="ux-card-copy">Enter your credentials.</p>
-
-        <form id="ux_form" action="/login" method="post" novalidate>
-          @csrf
-
-          <div id="ux_alert" class="ux-alert alert d-none" role="alert"></div>
-
-          <div class="ux-field">
-            <label class="ux-label" for="ux_id_or_email">Email or Phone Number</label>
-            <div class="ux-input-wrap">
-              <i class="ux-field-icon fa-solid fa-user"></i>
-              <input id="ux_id_or_email" type="text" class="ux-control" name="identifier" placeholder="you@example.com or 90000 00000" required>
-            </div>
-          </div>
-
-          <div class="ux-field">
-            <label class="ux-label" for="ux_pw">Password</label>
-            <div class="ux-input-wrap">
-              <i class="ux-field-icon fa-solid fa-lock"></i>
-              <input id="ux_pw" type="password" class="ux-control with-eye" name="password" placeholder="Enter your password" minlength="8" required>
-              <button type="button" class="ux-eye" id="ux_togglePw" aria-label="Toggle password visibility">
-                <i class="fa-regular fa-eye-slash" aria-hidden="true"></i>
-              </button>
-            </div>
-          </div>
-
-          <div class="ux-row">
-            <div class="form-check m-0">
-              <input class="form-check-input" type="checkbox" id="ux_keep">
-              <label class="form-check-label" for="ux_keep">Keep me logged in</label>
-            </div>
-            <a href="/forgot-password">Forgot password?</a>
-          </div>
-
-          <button class="ux-login" id="ux_btn" type="submit">
-            <span class="me-2"><i class="fa-solid fa-right-to-bracket"></i></span> Login
+      <div class="auth-field">
+        <label class="auth-label" for="a_pw">Password</label>
+        <div class="auth-input-wrap">
+          <i class="icon fa-solid fa-lock"></i>
+          <input id="a_pw" type="password" class="auth-input has-eye" name="password"
+                 placeholder="••••••••" minlength="8" autocomplete="current-password" required>
+          <button type="button" class="eye-btn" id="a_eye" aria-label="Show password">
+            <i class="fa-regular fa-eye-slash fa-sm"></i>
           </button>
-        </form>
-      </section>
-    </div>
-  </main>
-</div>
+        </div>
+      </div>
+
+      <div class="auth-row">
+        <label class="auth-check-label">
+          <input type="checkbox" class="auth-check" id="a_keep">
+          Keep me signed in
+        </label>
+      </div>
+
+      <button type="submit" class="auth-btn" id="a_btn">
+        <i class="fa-solid fa-right-to-bracket me-1"></i> Sign In
+      </button>
+    </form>
+
+
+  </div>
+
+  <div class="page-foot">
+   {{ date('Y') }} Attendance System
+  </div>
 
 <script>
-  (function(){
-    const LOGIN_API = "/api/auth/login";
-    const CHECK_API = "/api/auth/check";
+(function () {
+  const LOGIN_API = '/api/auth/login';
+  const CHECK_API = '/api/auth/check';
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const form    = document.getElementById('a_form');
+  const idIn    = document.getElementById('a_id');
+  const pwIn    = document.getElementById('a_pw');
+  const keepCb  = document.getElementById('a_keep');
+  const btn     = document.getElementById('a_btn');
+  const alertEl = document.getElementById('a_alert');
+  const alertMsg= document.getElementById('a_msg');
+  const alertIco= document.getElementById('a_icon');
+  const eyeBtn  = document.getElementById('a_eye');
+  const redirect= new URLSearchParams(window.location.search).get('redirect') || '';
 
-    const form = document.getElementById('ux_form');
-    const emailIn = document.getElementById('ux_id_or_email');
-    const pwIn = document.getElementById('ux_pw');
-    const keepCb = document.getElementById('ux_keep');
-    const btn = document.getElementById('ux_btn');
-    const alertEl = document.getElementById('ux_alert');
-    const toggle = document.getElementById('ux_togglePw');
-    const redirectParam = new URLSearchParams(window.location.search).get('redirect') || '';
+  function safePath(fallback) {
+    if (!redirect || !redirect.startsWith('/') || redirect.startsWith('//')) return fallback;
+    return redirect;
+  }
 
-    function resolveNextPath(fallback){
-      if (!redirectParam) return fallback;
-      if (!redirectParam.startsWith('/') || redirectParam.startsWith('//')) return fallback;
-      return redirectParam;
+  function setBusy(on) {
+    btn.disabled = on;
+    btn.innerHTML = on
+      ? '<i class="fa-solid fa-spinner fa-spin me-1"></i> Signing in...'
+      : '<i class="fa-solid fa-right-to-bracket me-1"></i> Sign In';
+  }
+
+  function showAlert(type, msg) {
+    alertEl.className = 'auth-alert show ' + (type === 'error' ? 'err' : 'ok');
+    alertIco.className = 'fa-solid fa-sm ' + (type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check');
+    alertMsg.textContent = msg;
+  }
+
+  function clearAlert() {
+    alertEl.className = 'auth-alert';
+  }
+
+  const store = {
+    set(token, role, keep) {
+      sessionStorage.setItem('token', token);
+      sessionStorage.setItem('role', role);
+      if (keep) { localStorage.setItem('token', token); localStorage.setItem('role', role); }
+      else       { localStorage.removeItem('token');     localStorage.removeItem('role'); }
+    },
+    clear() {
+      ['token','role'].forEach(k => { sessionStorage.removeItem(k); localStorage.removeItem(k); });
+    },
+    local() {
+      return { token: localStorage.getItem('token'), role: localStorage.getItem('role') };
     }
+  };
 
-    function setBusy(isBusy){
-      btn.disabled = isBusy;
-      btn.innerHTML = isBusy
-        ? '<i class="fa-solid fa-spinner fa-spin me-2"></i>Signing you in...'
-        : '<span class="me-2"><i class="fa-solid fa-right-to-bracket"></i></span> Login';
-    }
+  // Eye toggle
+  eyeBtn?.addEventListener('click', () => {
+    const show = pwIn.type === 'password';
+    pwIn.type = show ? 'text' : 'password';
+    eyeBtn.querySelector('i').className = 'fa-regular fa-sm ' + (show ? 'fa-eye' : 'fa-eye-slash');
+  });
 
-    function showAlert(kind, msg){
-      alertEl.classList.remove('d-none', 'alert-danger', 'alert-success', 'alert-warning');
-      alertEl.classList.add('alert', kind === 'error' ? 'alert-danger' : (kind === 'warn' ? 'alert-warning' : 'alert-success'));
-      alertEl.textContent = msg;
-    }
-
-    function clearAlert(){
-      alertEl.classList.add('d-none');
-      alertEl.textContent = '';
-    }
-
-    const authStore = {
-      set(token, role, keep){
-        sessionStorage.setItem('token', token);
-        sessionStorage.setItem('role', role);
-        if (keep) {
-          localStorage.setItem('token', token);
-          localStorage.setItem('role', role);
-        } else {
-          localStorage.removeItem('token');
-          localStorage.removeItem('role');
-        }
-      },
-      clear(){
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('role');
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-      },
-      getLocal(){
-        return {
-          token: localStorage.getItem('token'),
-          role: localStorage.getItem('role')
-        };
+  // Auto-login if token in localStorage
+  async function tryAutoLogin() {
+    const { token, role } = store.local();
+    if (!token) return;
+    try {
+      const res  = await fetch(CHECK_API, { headers: { 'Authorization': 'Bearer ' + token } });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.user) {
+        store.set(token, data.user.role || role, true);
+        window.location.replace(safePath('/dashboard'));
+      } else {
+        store.clear();
       }
-    };
+    } catch (_) {}
+  }
 
-    function rolePath(role){
-      const r = (role || '').toString().trim().toLowerCase();
-      return '/dashboard';
+  document.addEventListener('DOMContentLoaded', tryAutoLogin);
+
+  // Submit
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearAlert();
+
+    const identifier = idIn.value.trim();
+    const password   = pwIn.value;
+    const keep       = keepCb.checked;
+
+    if (!identifier || !password) {
+      showAlert('error', 'Please enter your email / phone and password.');
+      return;
     }
 
-    toggle?.addEventListener('click', () => {
-      const show = pwIn.type === 'password';
-      pwIn.type = show ? 'text' : 'password';
-      toggle.innerHTML = show
-        ? '<i class="fa-regular fa-eye" aria-hidden="true"></i>'
-        : '<i class="fa-regular fa-eye-slash" aria-hidden="true"></i>';
-    });
+    setBusy(true);
+    try {
+      const res  = await fetch(LOGIN_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+        body: JSON.stringify({ login: identifier, password, remember: keep })
+      });
+      const data = await res.json().catch(() => ({}));
 
-    async function tryAutoLoginFromLocal(){
-      const { token, role } = authStore.getLocal();
-      if (!token) return;
-
-      try {
-        const res = await fetch(CHECK_API, {
-          headers: { 'Authorization': 'Bearer ' + token }
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data && data.user) {
-          const resolvedRole = (data.user.role || role || '').toString().toLowerCase();
-          authStore.set(token, resolvedRole, true);
-          window.location.replace(resolveNextPath(rolePath(resolvedRole)));
-        } else {
-          authStore.clear();
-        }
-      } catch (error) {
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      tryAutoLoginFromLocal();
-    });
-
-    form?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      clearAlert();
-
-      const identifier = (emailIn.value || '').trim();
-      const password = pwIn.value || '';
-      const keep = !!keepCb.checked;
-
-      if (!identifier || !password) {
-        showAlert('error', 'Please enter both email or phone number and password.');
+      if (!res.ok) {
+        const msg = data?.message || data?.error
+          || (data?.errors ? Object.values(data.errors).flat().join(', ') : 'Login failed. Please try again.');
+        showAlert('error', msg);
         return;
       }
 
-      setBusy(true);
-      try {
-        const res = await fetch(LOGIN_API, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrf
-          },
-          body: JSON.stringify({ login: identifier, password, remember: keep })
-        });
+      const token = data?.access_token || data?.token || '';
+      const role  = (data?.user?.role || 'employee').toLowerCase();
 
-        const data = await res.json().catch(() => ({}));
+      if (!token) { showAlert('error', 'No token received from server.'); return; }
 
-        if (!res.ok) {
-          const msg = data?.message || data?.error || (data?.errors ? Object.values(data.errors).flat().join(', ') : 'Unable to log in.');
-          showAlert('error', msg);
-          setBusy(false);
-          return;
-        }
-
-        const token = data?.access_token || data?.token || '';
-        const role = (data?.user?.role || localStorage.getItem('role') || 'employee').toLowerCase();
-
-        if (!token) {
-          showAlert('error', 'No token received from server.');
-          setBusy(false);
-          return;
-        }
-
-        authStore.set(token, role, keep);
-        showAlert('success', 'Login successful. Redirecting...');
-        setTimeout(() => {
-          window.location.assign(resolveNextPath(rolePath(role)));
-        }, 500);
-      } catch (error) {
-        showAlert('error', 'Network error. Please try again.');
-      } finally {
-        setBusy(false);
-      }
-    });
-  })();
+      store.set(token, role, keep);
+      showAlert('success', 'Login successful — redirecting...');
+      setTimeout(() => window.location.assign(safePath('/dashboard')), 480);
+    } catch (_) {
+      showAlert('error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setBusy(false);
+    }
+  });
+})();
 </script>
 </body>
 </html>
