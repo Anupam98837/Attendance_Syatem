@@ -923,9 +923,11 @@
     } catch { return value; }
   }
   function toHrs(min) {
-    if (!min || min <= 0) return '0h';
-    const h = Math.floor(min / 60);
-    const m = min % 60;
+    if (min === null || min === undefined || min === '') return '—';
+    const minutes = Number(min);
+    if (!Number.isFinite(minutes) || minutes <= 0) return '0h';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
     if (h === 0) return `${m}m`;
     if (m === 0) return `${h}h`;
     return `${h}h ${m}m`;

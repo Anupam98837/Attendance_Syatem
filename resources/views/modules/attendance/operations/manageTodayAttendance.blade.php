@@ -341,7 +341,8 @@
     return parsed.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', hour12:true, timeZone: state.companyTz });
   }
   function minutesLabel(min) {
-    const minutes = Number(min || 0);
+    if (min === null || min === undefined || min === '') return '—';
+    const minutes = Number(min);
     if (!Number.isFinite(minutes) || minutes <= 0) return '0m';
     const hrs = Math.floor(minutes / 60);
     const mins = minutes % 60;

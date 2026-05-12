@@ -1063,7 +1063,8 @@ class AttendanceMobileController extends Controller
 
     private function decorateAttendanceRecord(object $record): object
     {
-        if (($record->total_working_minutes ?? null) === null) {
+        $hasCheckTimes = ($record->check_in_time ?? null) !== null && ($record->check_out_time ?? null) !== null;
+        if ($hasCheckTimes && (($record->total_working_minutes ?? null) === null || (int) $record->total_working_minutes === 0)) {
             $record->total_working_minutes = $this->calculateWorkingMinutesFromTimes(
                 $record->check_in_time ?? null,
                 $record->check_out_time ?? null,

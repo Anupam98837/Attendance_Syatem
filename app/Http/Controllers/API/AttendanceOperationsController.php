@@ -1263,7 +1263,8 @@ class AttendanceOperationsController extends Controller
 
     private function hydrateAttendanceMetrics(object $row): object
     {
-        if (($row->total_working_minutes ?? null) === null) {
+        $hasCheckTimes = ($row->check_in_time ?? null) !== null && ($row->check_out_time ?? null) !== null;
+        if ($hasCheckTimes && (($row->total_working_minutes ?? null) === null || (int) $row->total_working_minutes === 0)) {
             $row->total_working_minutes = $this->calculateWorkingMinutesFromTimes(
                 $row->check_in_time ?? null,
                 $row->check_out_time ?? null,
