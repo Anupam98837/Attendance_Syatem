@@ -203,12 +203,14 @@ Route::prefix('attendance')->middleware('checkAuth')->group(function () {
 
         Route::get('/dashboard', [AttendanceOperationsController::class, 'dashboard']);
         Route::get('/live-attendance', [AttendanceOperationsController::class, 'liveAttendance']);
+        Route::get('/live-attendance/export', [AttendanceOperationsController::class, 'exportLiveAttendance']);
         Route::get('/attendance', [AttendanceOperationsController::class, 'attendanceIndex']);
         Route::get('/attendance/{attendanceId}/detail', [AttendanceOperationsController::class, 'attendanceDetail']);
         Route::get('/pending-approvals', [AttendanceOperationsController::class, 'pendingApprovals']);
         Route::post('/approvals/{id}/decision', [AttendanceOperationsController::class, 'decideApproval']);
         Route::post('/attendance/{attendanceId}/manual-correction', [AttendanceOperationsController::class, 'manualCorrection']);
         Route::get('/reports', [AttendanceOperationsController::class, 'reports']);
+        Route::get('/reports/export', [AttendanceOperationsController::class, 'exportReports']);
         Route::get('/offline-sync-logs', [AttendanceOperationsController::class, 'offlineSyncLogs']);
         Route::get('/location-exceptions', [AttendanceOperationsController::class, 'locationExceptions']);
         Route::get('/leaves', [AttendanceOperationsController::class, 'leaveIndex']);

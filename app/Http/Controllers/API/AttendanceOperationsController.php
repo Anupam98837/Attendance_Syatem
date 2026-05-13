@@ -92,121 +92,14 @@ class AttendanceOperationsController extends Controller
 
     public function liveAttendance(Request $request)
     {
-        $date = $request->query('date', now()->toDateString());
         $perPage = max(1, min(200, (int) $request->query('per_page', 20)));
-
-        $latestLogIds = DB::table('attendance_logs')
-            ->whereDate('punch_time', $date)
-            ->whereNull('deleted_at')
-            ->selectRaw('employee_attendance_id, MAX(id) as id')
-            ->groupBy('employee_attendance_id');
-
-        $latestTrackIds = DB::table('attendance_location_tracks')
-            ->whereNull('deleted_at')
-            ->selectRaw('employee_attendance_id, MAX(id) as id')
-            ->groupBy('employee_attendance_id');
-
-        $query = $this->activeEmployeesBaseQuery()
-            ->leftJoin('employee_attendance as ea', function ($join) use ($date) {
-                $join->on('ea.employee_profile_id', '=', 'ep.id')
-                    ->whereDate('ea.attendance_date', '=', $date)
-                    ->whereNull('ea.deleted_at');
-            })
-            ->leftJoinSub($latestLogIds, 'latest_logs', function ($join) {
-                $join->on('latest_logs.employee_attendance_id', '=', 'ea.id');
-            })
-            ->leftJoin('attendance_logs as al', 'al.id', '=', 'latest_logs.id')
-            ->leftJoinSub($latestTrackIds, 'latest_tracks', function ($join) {
-                $join->on('latest_tracks.employee_attendance_id', '=', 'ea.id');
-            })
-            ->leftJoin('attendance_location_tracks as alt', 'alt.id', '=', 'latest_tracks.id')
-            ->leftJoin('departments as d', 'd.id', '=', 'ep.department_id')
-            ->leftJoin('designations as dg', 'dg.id', '=', 'ep.designation_id')
-            ->leftJoin('branches as b', 'b.id', '=', 'ep.branch_id')
-            ->leftJoin('shifts as s', 's.id', '=', 'ep.shift_id')
-            ->select([
-                'ep.id as employee_profile_id',
-                'ep.employee_code',
-                'u.id as user_id',
-                'u.uuid as user_uuid',
-                'u.name',
-                'u.email',
-                'u.phone_number',
-                'd.name as department_name',
-                'dg.name as designation_name',
-                'b.name as branch_name',
-                's.name as shift_name',
-                's.start_time as shift_start_time',
-                's.end_time as shift_end_time',
-                's.break_minutes as shift_break_minutes',
-                'ea.id as attendance_id',
-                'ea.attendance_date',
-                'ea.status as attendance_status',
-                'ea.attendance_mode',
-                'ea.work_mode',
-                'ea.sync_status',
-                'ea.approval_status',
-                'ea.check_in_time',
-                'ea.check_out_time',
-                'ea.break_minutes',
-                'ea.total_working_minutes',
-                'ea.late_minutes',
-                'ea.overtime_minutes',
-                'ea.within_geofence',
-                'ea.within_wifi_ip',
-                'al.id as latest_log_id',
-                'al.punch_type as latest_punch_type',
-                'al.punch_time as latest_punch_time',
-                'al.location_text as latest_location_text',
-                'al.latitude as latest_latitude',
-                'al.longitude as latest_longitude',
-                'al.network_type as latest_network_type',
-                'al.internet_status as latest_internet_status',
-                'al.request_ip as latest_request_ip',
-                'al.selfie_path as latest_selfie_path',
-                'al.sync_status as latest_log_sync_status',
-                'al.exception_reason as latest_exception_reason',
-                'alt.recorded_at as latest_track_time',
-                'alt.latitude as latest_track_latitude',
-                'alt.longitude as latest_track_longitude',
-                'alt.gps_accuracy_meters as latest_track_accuracy',
-                'alt.network_type as latest_track_network_type',
-                'alt.sync_status as latest_track_sync_status',
-            ]);
-
-        $this->applyEmployeeFilters($query, $request);
-
-        if ($request->filled('status')) {
-            $status = (string) $request->query('status');
-            if ($status === 'pending' || $status === 'not_marked') {
-                $query->whereNull('ea.id');
-            } else {
-                $query->where('ea.status', $status);
-            }
-        }
-
-        if ($request->filled('q')) {
-            $term = '%' . trim((string) $request->query('q')) . '%';
-            $query->where(function ($builder) use ($term) {
-                $builder->where('u.name', 'like', $term)
-                    ->orWhere('u.email', 'like', $term)
-                    ->orWhere('u.phone_number', 'like', $term)
-                    ->orWhere('ep.employee_code', 'like', $term);
-            });
-        }
+        [$query] = $this->buildLiveAttendanceQuery($request);
 
         $paginator = $query->orderByRaw('CASE WHEN ea.check_in_time IS NULL THEN 1 ELSE 0 END ASC')
             ->orderBy('u.name')
             ->paginate($perPage);
 
-        $rows = collect($paginator->items())->map(function ($row) {
-            $row = $this->hydrateAttendanceMetrics($row);
-            $row->live_status = $row->attendance_id
-                ? ($row->attendance_status ?: 'present')
-                : 'not_marked';
-            $row->active_session = !empty($row->check_in_time) && empty($row->check_out_time);
-            return $row;
-        })->values()->all();
+        $rows = $this->hydrateLiveAttendanceRows($paginator->items());
 
         return response()->json([
             'status' => 'success',
@@ -217,6 +110,51 @@ class AttendanceOperationsController extends Controller
                 'total' => $paginator->total(),
                 'last_page' => $paginator->lastPage(),
             ],
+        ]);
+    }
+
+    public function exportLiveAttendance(Request $request)
+    {
+        [$query, $date] = $this->buildLiveAttendanceQuery($request);
+        $rows = $this->hydrateLiveAttendanceRows(
+            $query->orderByRaw('CASE WHEN ea.check_in_time IS NULL THEN 1 ELSE 0 END ASC')
+                ->orderBy('u.name')
+                ->get()
+                ->all()
+        );
+
+        $summary = [
+            'type' => 'today_attendance',
+            'date' => $date,
+            'count' => count($rows),
+        ];
+
+        $xml = $this->buildSpreadsheetXml('Today Attendance', [
+            ['key' => 'name', 'label' => 'Employee'],
+            ['key' => 'employee_code', 'label' => 'Employee Code'],
+            ['key' => 'department_name', 'label' => 'Department'],
+            ['key' => 'designation_name', 'label' => 'Designation'],
+            ['key' => 'branch_name', 'label' => 'Branch'],
+            ['key' => 'shift_name', 'label' => 'Shift'],
+            ['key' => 'live_status', 'label' => 'Status'],
+            ['key' => 'check_in_time', 'label' => 'Check In'],
+            ['key' => 'check_out_time', 'label' => 'Check Out'],
+            ['key' => 'late_minutes', 'label' => 'Late Minutes'],
+            ['key' => 'total_working_minutes', 'label' => 'Working Minutes'],
+            ['key' => 'approval_status', 'label' => 'Approval Status'],
+            ['key' => 'attendance_mode', 'label' => 'Attendance Mode'],
+            ['key' => 'work_mode', 'label' => 'Work Mode'],
+            ['key' => 'latest_location_text', 'label' => 'Latest Location'],
+            ['key' => 'latest_request_ip', 'label' => 'Request IP'],
+            ['key' => 'latest_network_type', 'label' => 'Network'],
+            ['key' => 'latest_exception_reason', 'label' => 'Exception'],
+        ], $rows, $summary);
+
+        return response($xml, 200, [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="today_attendance_' . now()->format('Ymd_His') . '.xls"',
+            'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
+            'Pragma' => 'public',
         ]);
     }
 
@@ -813,6 +751,31 @@ class AttendanceOperationsController extends Controller
 
     public function reports(Request $request)
     {
+        [$rows, $summary] = $this->buildReportPayload($request);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $rows,
+            'summary' => $summary,
+        ]);
+    }
+
+    public function exportReports(Request $request)
+    {
+        [$rows, $summary] = $this->buildReportPayload($request);
+        [$filename, $worksheetTitle, $columns] = $this->reportExportBlueprint($summary);
+        $xml = $this->buildSpreadsheetXml($worksheetTitle, $columns, $rows, $summary);
+
+        return response($xml, 200, [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Cache-Control' => 'max-age=0, no-cache, no-store, must-revalidate',
+            'Pragma' => 'public',
+        ]);
+    }
+
+    private function buildReportPayload(Request $request): array
+    {
         $validated = $request->validate([
             'type' => 'required|string|in:daily,monthly,late,absent,overtime,offline,location_exception,payroll',
             'date' => 'sometimes|nullable|date',
@@ -828,7 +791,7 @@ class AttendanceOperationsController extends Controller
 
         if ($type === 'absent') {
             $date = $validated['date'] ?? $fromDate ?? now()->toDateString();
-            $rows = $this->activeEmployeesBaseQuery()
+            $query = $this->activeEmployeesBaseQuery()
                 ->leftJoin('employee_attendance as ea', function ($join) use ($date) {
                     $join->on('ea.employee_profile_id', '=', 'ep.id')
                         ->whereDate('ea.attendance_date', '=', $date)
@@ -848,19 +811,17 @@ class AttendanceOperationsController extends Controller
                     'd.name as department_name',
                     'dg.name as designation_name',
                     'b.name as branch_name',
-                ])
-                ->orderBy('u.name')
-                ->get();
+                ]);
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $rows,
-                'summary' => [
-                    'type' => $type,
-                    'date' => $date,
-                    'count' => $rows->count(),
-                ],
-            ]);
+            $this->applyEmployeeFilters($query, $request);
+
+            $rows = $query->orderBy('u.name')->get();
+
+            return [$rows->values()->all(), [
+                'type' => $type,
+                'date' => $date,
+                'count' => $rows->count(),
+            ]];
         }
 
         if ($type === 'location_exception') {
@@ -887,16 +848,12 @@ class AttendanceOperationsController extends Controller
 
             $rows = $query->orderByDesc('al.punch_time')->get();
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $rows,
-                'summary' => [
-                    'type' => $type,
-                    'from' => $fromDate,
-                    'to' => $toDate,
-                    'count' => $rows->count(),
-                ],
-            ]);
+            return [$rows->values()->all(), [
+                'type' => $type,
+                'from' => $fromDate,
+                'to' => $toDate,
+                'count' => $rows->count(),
+            ]];
         }
 
         if (in_array($type, ['monthly', 'payroll'], true)) {
@@ -950,16 +907,12 @@ class AttendanceOperationsController extends Controller
                 ->orderBy('u.name')
                 ->get();
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $rows,
-                'summary' => [
-                    'type' => $type,
-                    'from' => $fromDate,
-                    'to' => $toDate,
-                    'count' => $rows->count(),
-                ],
-            ]);
+            return [$rows->values()->all(), [
+                'type' => $type,
+                'from' => $fromDate,
+                'to' => $toDate,
+                'count' => $rows->count(),
+            ]];
         }
 
         $query = $this->attendanceBaseQuery()
@@ -980,16 +933,12 @@ class AttendanceOperationsController extends Controller
             ->map(fn ($row) => $this->hydrateAttendanceMetrics($row))
             ->values();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => $rows,
-            'summary' => [
-                'type' => $type,
-                'from' => $fromDate,
-                'to' => $toDate,
-                'count' => $rows->count(),
-            ],
-        ]);
+        return [$rows->values()->all(), [
+            'type' => $type,
+            'from' => $fromDate,
+            'to' => $toDate,
+            'count' => $rows->count(),
+        ]];
     }
 
     public function offlineSyncLogs(Request $request)
@@ -1304,5 +1253,309 @@ class AttendanceOperationsController extends Controller
     private function existingTableColumns(string $table, array $columns): array
     {
         return array_values(array_filter($columns, fn ($column) => Schema::hasColumn($table, $column)));
+    }
+
+    private function buildLiveAttendanceQuery(Request $request): array
+    {
+        $date = $request->query('date', now()->toDateString());
+
+        $latestLogIds = DB::table('attendance_logs')
+            ->whereDate('punch_time', $date)
+            ->whereNull('deleted_at')
+            ->selectRaw('employee_attendance_id, MAX(id) as id')
+            ->groupBy('employee_attendance_id');
+
+        $latestTrackIds = DB::table('attendance_location_tracks')
+            ->whereNull('deleted_at')
+            ->selectRaw('employee_attendance_id, MAX(id) as id')
+            ->groupBy('employee_attendance_id');
+
+        $query = $this->activeEmployeesBaseQuery()
+            ->leftJoin('employee_attendance as ea', function ($join) use ($date) {
+                $join->on('ea.employee_profile_id', '=', 'ep.id')
+                    ->whereDate('ea.attendance_date', '=', $date)
+                    ->whereNull('ea.deleted_at');
+            })
+            ->leftJoinSub($latestLogIds, 'latest_logs', function ($join) {
+                $join->on('latest_logs.employee_attendance_id', '=', 'ea.id');
+            })
+            ->leftJoin('attendance_logs as al', 'al.id', '=', 'latest_logs.id')
+            ->leftJoinSub($latestTrackIds, 'latest_tracks', function ($join) {
+                $join->on('latest_tracks.employee_attendance_id', '=', 'ea.id');
+            })
+            ->leftJoin('attendance_location_tracks as alt', 'alt.id', '=', 'latest_tracks.id')
+            ->leftJoin('departments as d', 'd.id', '=', 'ep.department_id')
+            ->leftJoin('designations as dg', 'dg.id', '=', 'ep.designation_id')
+            ->leftJoin('branches as b', 'b.id', '=', 'ep.branch_id')
+            ->leftJoin('shifts as s', 's.id', '=', 'ep.shift_id')
+            ->select([
+                'ep.id as employee_profile_id',
+                'ep.employee_code',
+                'u.id as user_id',
+                'u.uuid as user_uuid',
+                'u.name',
+                'u.email',
+                'u.phone_number',
+                'd.name as department_name',
+                'dg.name as designation_name',
+                'b.name as branch_name',
+                's.name as shift_name',
+                's.start_time as shift_start_time',
+                's.end_time as shift_end_time',
+                's.break_minutes as shift_break_minutes',
+                'ea.id as attendance_id',
+                'ea.attendance_date',
+                'ea.status as attendance_status',
+                'ea.attendance_mode',
+                'ea.work_mode',
+                'ea.sync_status',
+                'ea.approval_status',
+                'ea.check_in_time',
+                'ea.check_out_time',
+                'ea.break_minutes',
+                'ea.total_working_minutes',
+                'ea.late_minutes',
+                'ea.overtime_minutes',
+                'ea.within_geofence',
+                'ea.within_wifi_ip',
+                'al.id as latest_log_id',
+                'al.punch_type as latest_punch_type',
+                'al.punch_time as latest_punch_time',
+                'al.location_text as latest_location_text',
+                'al.latitude as latest_latitude',
+                'al.longitude as latest_longitude',
+                'al.network_type as latest_network_type',
+                'al.internet_status as latest_internet_status',
+                'al.request_ip as latest_request_ip',
+                'al.selfie_path as latest_selfie_path',
+                'al.sync_status as latest_log_sync_status',
+                'al.exception_reason as latest_exception_reason',
+                'alt.recorded_at as latest_track_time',
+                'alt.latitude as latest_track_latitude',
+                'alt.longitude as latest_track_longitude',
+                'alt.gps_accuracy_meters as latest_track_accuracy',
+                'alt.network_type as latest_track_network_type',
+                'alt.sync_status as latest_track_sync_status',
+            ]);
+
+        $this->applyEmployeeFilters($query, $request);
+
+        if ($request->filled('status')) {
+            $status = (string) $request->query('status');
+            if ($status === 'pending' || $status === 'not_marked') {
+                $query->whereNull('ea.id');
+            } else {
+                $query->where('ea.status', $status);
+            }
+        }
+
+        if ($request->filled('q')) {
+            $term = '%' . trim((string) $request->query('q')) . '%';
+            $query->where(function ($builder) use ($term) {
+                $builder->where('u.name', 'like', $term)
+                    ->orWhere('u.email', 'like', $term)
+                    ->orWhere('u.phone_number', 'like', $term)
+                    ->orWhere('ep.employee_code', 'like', $term);
+            });
+        }
+
+        return [$query, $date];
+    }
+
+    private function hydrateLiveAttendanceRows(array $items): array
+    {
+        return collect($items)->map(function ($row) {
+            $row = $this->hydrateAttendanceMetrics($row);
+            $row->live_status = $row->attendance_id
+                ? ($row->attendance_status ?: 'present')
+                : 'not_marked';
+            $row->active_session = !empty($row->check_in_time) && empty($row->check_out_time);
+            return $row;
+        })->values()->all();
+    }
+
+    private function reportExportBlueprint(array $summary): array
+    {
+        $type = (string) ($summary['type'] ?? 'daily');
+        $stamp = now()->format('Ymd_His');
+
+        if (in_array($type, ['monthly', 'payroll'], true)) {
+            return [
+                "attendance_{$type}_report_{$stamp}.xls",
+                $type === 'payroll' ? 'Payroll Report' : 'Monthly Report',
+                [
+                    ['key' => 'name', 'label' => 'Employee'],
+                    ['key' => 'employee_code', 'label' => 'Employee Code'],
+                    ['key' => 'department_name', 'label' => 'Department'],
+                    ['key' => 'designation_name', 'label' => 'Designation'],
+                    ['key' => 'branch_name', 'label' => 'Branch'],
+                    ['key' => 'marked_days', 'label' => 'Marked Days'],
+                    ['key' => 'present_days', 'label' => 'Present Days'],
+                    ['key' => 'late_days', 'label' => 'Late Days'],
+                    ['key' => 'half_days', 'label' => 'Half Days'],
+                    ['key' => 'offline_days', 'label' => 'Offline Days'],
+                    ['key' => 'total_working_minutes', 'label' => 'Working Minutes'],
+                    ['key' => 'total_overtime_minutes', 'label' => 'Overtime Minutes'],
+                ],
+            ];
+        }
+
+        if ($type === 'absent') {
+            return [
+                "attendance_absent_report_{$stamp}.xls",
+                'Absent Report',
+                [
+                    ['key' => 'name', 'label' => 'Employee'],
+                    ['key' => 'employee_code', 'label' => 'Employee Code'],
+                    ['key' => 'department_name', 'label' => 'Department'],
+                    ['key' => 'designation_name', 'label' => 'Designation'],
+                    ['key' => 'branch_name', 'label' => 'Branch'],
+                    ['key' => '__report_date', 'label' => 'Report Date'],
+                ],
+            ];
+        }
+
+        if ($type === 'location_exception') {
+            return [
+                "attendance_location_exception_report_{$stamp}.xls",
+                'Location Exception Report',
+                [
+                    ['key' => 'punch_time', 'label' => 'Punch Time'],
+                    ['key' => 'name', 'label' => 'Employee'],
+                    ['key' => 'employee_code', 'label' => 'Employee Code'],
+                    ['key' => 'branch_name', 'label' => 'Branch'],
+                    ['key' => 'punch_type', 'label' => 'Punch Type'],
+                    ['key' => 'location_text', 'label' => 'Location'],
+                    ['key' => 'network_type', 'label' => 'Network'],
+                    ['key' => 'request_ip', 'label' => 'Request IP'],
+                    ['key' => 'exception_reason', 'label' => 'Exception'],
+                ],
+            ];
+        }
+
+        return [
+            "attendance_{$type}_report_{$stamp}.xls",
+            ucfirst(str_replace('_', ' ', $type)) . ' Report',
+            [
+                ['key' => 'attendance_date', 'label' => 'Attendance Date'],
+                ['key' => 'name', 'label' => 'Employee'],
+                ['key' => 'employee_code', 'label' => 'Employee Code'],
+                ['key' => 'department_name', 'label' => 'Department'],
+                ['key' => 'designation_name', 'label' => 'Designation'],
+                ['key' => 'branch_name', 'label' => 'Branch'],
+                ['key' => 'shift_name', 'label' => 'Shift'],
+                ['key' => 'check_in_time', 'label' => 'Check In'],
+                ['key' => 'check_out_time', 'label' => 'Check Out'],
+                ['key' => 'status', 'label' => 'Status'],
+                ['key' => 'late_minutes', 'label' => 'Late Minutes'],
+                ['key' => 'attendance_mode', 'label' => 'Attendance Mode'],
+                ['key' => 'work_mode', 'label' => 'Work Mode'],
+                ['key' => 'total_working_minutes', 'label' => 'Working Minutes'],
+                ['key' => 'overtime_minutes', 'label' => 'Overtime Minutes'],
+                ['key' => 'approval_status', 'label' => 'Approval Status'],
+                ['key' => 'sync_status', 'label' => 'Sync Status'],
+            ],
+        ];
+    }
+
+    private function buildSpreadsheetXml(string $worksheetTitle, array $columns, array $rows, array $summary): string
+    {
+        $sheetName = $this->xmlEscape(substr($worksheetTitle, 0, 31));
+        $title = $this->xmlEscape($worksheetTitle);
+        $generatedAt = $this->xmlEscape(now()->format('Y-m-d h:i A'));
+        $filterParts = [];
+
+        foreach (['date', 'from', 'to', 'month', 'type'] as $key) {
+            if (!empty($summary[$key])) {
+                $filterParts[] = strtoupper(str_replace('_', ' ', $key)) . ': ' . $summary[$key];
+            }
+        }
+
+        $xmlRows = [];
+        $xmlRows[] = '<Row><Cell ss:StyleID="header"><Data ss:Type="String">' . $title . '</Data></Cell></Row>';
+        $xmlRows[] = '<Row><Cell><Data ss:Type="String">Generated At: ' . $generatedAt . '</Data></Cell></Row>';
+        $xmlRows[] = '<Row><Cell><Data ss:Type="String">Record Count: ' . (int) ($summary['count'] ?? count($rows)) . '</Data></Cell></Row>';
+        if ($filterParts) {
+            $xmlRows[] = '<Row><Cell><Data ss:Type="String">' . $this->xmlEscape(implode(' | ', $filterParts)) . '</Data></Cell></Row>';
+        }
+        $xmlRows[] = '<Row></Row>';
+
+        $headerCells = array_map(function ($column) {
+            return '<Cell ss:StyleID="header"><Data ss:Type="String">' . $this->xmlEscape((string) ($column['label'] ?? $column['key'])) . '</Data></Cell>';
+        }, $columns);
+        $xmlRows[] = '<Row>' . implode('', $headerCells) . '</Row>';
+
+        foreach ($rows as $row) {
+            $cells = [];
+            foreach ($columns as $column) {
+                $value = $this->reportExportValue($row, (string) $column['key'], $summary);
+                $type = is_numeric($value) && $value !== '' ? 'Number' : 'String';
+                $cells[] = '<Cell><Data ss:Type="' . $type . '">' . $this->xmlEscape((string) $value) . '</Data></Cell>';
+            }
+            $xmlRows[] = '<Row>' . implode('', $cells) . '</Row>';
+        }
+
+        return <<<XML
+<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal">
+      <Alignment ss:Vertical="Bottom"/>
+      <Borders/>
+      <Font ss:FontName="Calibri" ss:Size="11"/>
+      <Interior/>
+      <NumberFormat/>
+      <Protection/>
+    </Style>
+    <Style ss:ID="header">
+      <Font ss:Bold="1"/>
+      <Interior ss:Color="#DCEFEA" ss:Pattern="Solid"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="{$sheetName}">
+    <Table>
+      {$this->implodeXmlRows($xmlRows)}
+    </Table>
+  </Worksheet>
+</Workbook>
+XML;
+    }
+
+    private function reportExportValue($row, string $key, array $summary)
+    {
+        if ($key === '__report_date') {
+            return $summary['date'] ?? $summary['from'] ?? '';
+        }
+
+        $value = is_array($row) ? ($row[$key] ?? null) : ($row->{$key} ?? null);
+
+        if ($value === null) {
+            return '';
+        }
+
+        if (in_array($key, ['total_working_minutes', 'overtime_minutes', 'total_overtime_minutes', 'late_minutes'], true)) {
+            return (int) $value;
+        }
+
+        if (str_ends_with($key, '_days') || in_array($key, ['marked_days', 'present_days', 'half_days', 'offline_days'], true)) {
+            return (int) $value;
+        }
+
+        return is_scalar($value) ? $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    private function xmlEscape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    }
+
+    private function implodeXmlRows(array $rows): string
+    {
+        return implode("\n      ", $rows);
     }
 }

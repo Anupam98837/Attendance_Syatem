@@ -221,6 +221,7 @@
             <input type="search" class="form-control" id="fltQ" placeholder="Employee, code, email, phone">
           </div>
           <div class="ms-auto d-flex gap-2">
+            <button type="button" class="btn btn-success" id="liveExportBtn"><i class="fa-solid fa-file-excel me-1"></i>Export Excel</button>
             <button type="button" class="btn btn-light" id="liveResetBtn"><i class="fa-solid fa-rotate-left me-1"></i>Reset</button>
             <button type="button" class="btn btn-primary" id="liveRefreshBtn"><i class="fa-solid fa-arrows-rotate me-1"></i>Refresh</button>
           </div>
@@ -390,6 +391,30 @@
     if (state.filters.status) params.set('status', state.filters.status);
     if (state.filters.q) params.set('q', state.filters.q);
     return params.toString();
+  }
+
+  async function exportTodayAttendance() {
+    const res = await api(`/api/attendance/hr/live-attendance/export?${buildQuery()}`);
+    if (!res.ok) {
+      let message = 'Could not export today attendance.';
+      try {
+        const json = await res.json();
+        message = json.message || message;
+      } catch (_) {}
+      throw new Error(message);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+    const filename = filenameMatch?.[1] || `today_attendance_${state.filters.date}.xls`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
   function renderStats(summary) {
@@ -705,6 +730,11 @@
     refreshAll();
   });
   document.getElementById('liveRefreshBtn').addEventListener('click', refreshAll);
+  document.getElementById('liveExportBtn').addEventListener('click', () => {
+    exportTodayAttendance().catch((error) => {
+      Swal.fire('Export failed', error.message, 'error');
+    });
+  });
   document.getElementById('liveResetBtn').addEventListener('click', () => {
     state.page = 1;
     state.selected = null;

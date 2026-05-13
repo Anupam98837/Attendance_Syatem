@@ -7,6 +7,8 @@
   $boardDefaultQuery = $boardDefaultQuery ?? [];
   $boardActions = $boardActions ?? [];
   $boardDetailEndpoint = $boardDetailEndpoint ?? '/api/attendance/hr/attendance/{id}/detail';
+  $boardExportEndpoint = $boardExportEndpoint ?? null;
+  $boardPrintable = $boardPrintable ?? false;
 @endphp
 
 @push('styles')
@@ -254,6 +256,12 @@
         </div>
       @endforeach
       <div class="ms-auto d-flex align-items-end gap-2">
+        @if ($boardPrintable)
+          <button type="button" class="btn btn-light" id="boardPrintBtn"><i class="fa-solid fa-print me-1"></i>Print</button>
+        @endif
+        @if ($boardExportEndpoint)
+          <button type="button" class="btn btn-success" id="boardExportBtn"><i class="fa-solid fa-file-excel me-1"></i>Export Excel</button>
+        @endif
         <button type="button" class="btn btn-light" id="boardResetBtn"><i class="fa-solid fa-rotate-left me-1"></i>Reset</button>
         <button type="button" class="btn btn-primary" id="boardRefreshBtn"><i class="fa-solid fa-arrows-rotate me-1"></i>Refresh</button>
       </div>
@@ -299,6 +307,8 @@
     defaults: @json($boardDefaultQuery),
     actions: @json($boardActions),
     detailEndpoint: @json($boardDetailEndpoint),
+    exportEndpoint: @json($boardExportEndpoint),
+    printable: @json($boardPrintable),
   };
 
   const token = sessionStorage.getItem('token') || localStorage.getItem('token');
@@ -312,8 +322,12 @@
   const pager = document.getElementById('boardPager');
   const info = document.getElementById('boardInfo');
   const filters = Array.from(document.querySelectorAll('.board-filter'));
+  const exportBtn = document.getElementById('boardExportBtn');
+  const printBtn = document.getElementById('boardPrintBtn');
   const companyTz = localStorage.getItem('companyTz') || Intl.DateTimeFormat().resolvedOptions().timeZone;
   let relationFiltersLoaded = false;
+  let lastRows = [];
+  let lastSummary = {};
 
   function headers(json = false) {
     return json
@@ -537,6 +551,114 @@
       return escapeHtml(formatMinutes(raw));
     }
     return escapeHtml(String(raw));
+  }
+
+  function htmlToText(html) {
+    const el = document.createElement('div');
+    el.innerHTML = html;
+    return (el.textContent || el.innerText || '').trim();
+  }
+
+  function textCellValue(row, column) {
+    return htmlToText(cellValue(row, column)) || '—';
+  }
+
+  function activeFilterSummary() {
+    return filters.map((filter) => {
+      const value = state[filter.dataset.key];
+      if (value === '' || value === null || value === undefined) return null;
+      const label = filter.closest('div')?.querySelector('label')?.textContent?.trim() || filter.dataset.key;
+      const selectedText = filter.tagName === 'SELECT'
+        ? (filter.options[filter.selectedIndex]?.text || value)
+        : value;
+      return `${label}: ${selectedText}`;
+    }).filter(Boolean);
+  }
+
+  async function exportBoard() {
+    if (!config.exportEndpoint) return;
+    const response = await fetch(`${config.exportEndpoint}?${buildQuery()}`, { headers: headers(false) });
+    if (!response.ok) {
+      let message = 'Could not export report.';
+      try {
+        const payload = await response.json();
+        message = payload.message || message;
+      } catch (_) {}
+      throw new Error(message);
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+    const filename = filenameMatch?.[1] || `${config.title || 'attendance-report'}.xls`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  function printBoard() {
+    if (!config.printable) return;
+
+    const summaryBits = activeFilterSummary();
+    const printWindow = window.open('', '_blank', 'noopener,width=1200,height=900');
+    if (!printWindow) throw new Error('Popup blocked. Please allow popups to print this report.');
+
+    const tableRows = lastRows.length
+      ? lastRows.map((row) => `
+          <tr>
+            ${config.columns.map((column) => `<td>${escapeHtml(textCellValue(row, column))}</td>`).join('')}
+          </tr>
+        `).join('')
+      : `<tr><td colspan="${config.columns.length}" style="text-align:center;color:#64748b;padding:18px;">No records available for print.</td></tr>`;
+
+    const filterBlock = summaryBits.length
+      ? `<p><strong>Filters:</strong> ${escapeHtml(summaryBits.join(' | '))}</p>`
+      : '<p><strong>Filters:</strong> Default view</p>';
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${escapeHtml(@json($boardTitle))}</title>
+          <style>
+            body{font-family:Arial,Helvetica,sans-serif;color:#0f172a;margin:24px}
+            h1{margin:0 0 8px;font-size:24px}
+            p{margin:0 0 8px;font-size:13px;color:#334155}
+            table{width:100%;border-collapse:collapse;margin-top:16px}
+            th,td{border:1px solid #cbd5e1;padding:8px 10px;text-align:left;font-size:12px;vertical-align:top}
+            th{background:#e2e8f0;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+            .meta{margin-bottom:14px}
+            @media print{body{margin:12px}}
+          </style>
+        </head>
+        <body>
+          <div class="meta">
+            <h1>${escapeHtml(@json($boardTitle))}</h1>
+            <p>${escapeHtml(@json($boardLead))}</p>
+            <p><strong>Printed:</strong> ${escapeHtml(new Date().toLocaleString([], { hour12: true, timeZone: companyTz }))}</p>
+            ${filterBlock}
+            <p><strong>Records:</strong> ${escapeHtml(String(lastSummary.count ?? lastRows.length ?? 0))}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>${config.columns.map((column) => `<th>${escapeHtml(column.label || column.key)}</th>`).join('')}</tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
   }
 
   function actionButtons(row) {
@@ -835,6 +957,8 @@
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Could not load data.');
       const rows = data.data || [];
+      lastRows = rows;
+      lastSummary = data.summary || {};
       renderRows(rows);
       renderPager(data.pagination || {});
       if (data.pagination?.total !== undefined) {
@@ -846,6 +970,8 @@
       }
     } catch (error) {
       tbody.innerHTML = `<tr><td colspan="${colspan}" class="att-board-empty text-danger">${escapeHtml(error.message)}</td></tr>`;
+      lastRows = [];
+      lastSummary = {};
     }
   }
 
@@ -910,6 +1036,20 @@
   });
 
   document.getElementById('boardRefreshBtn').addEventListener('click', loadBoard);
+  exportBtn?.addEventListener('click', async () => {
+    try {
+      await exportBoard();
+    } catch (error) {
+      Swal.fire('Export failed', error.message, 'error');
+    }
+  });
+  printBtn?.addEventListener('click', () => {
+    try {
+      printBoard();
+    } catch (error) {
+      Swal.fire('Print failed', error.message, 'error');
+    }
+  });
   document.getElementById('boardResetBtn').addEventListener('click', () => {
     Object.keys(state).forEach((key) => delete state[key]);
     Object.assign(state, { page: 1, per_page: 20 }, config.defaults || {});

@@ -7,6 +7,8 @@
   $boardTitle = 'Monthly Attendance';
   $boardLead = 'Review month-level attendance summaries for payroll preparation, trend analysis, and workload monitoring.';
   $boardEndpoint = '/api/attendance/hr/reports';
+  $boardExportEndpoint = '/api/attendance/hr/reports/export';
+  $boardPrintable = true;
   $boardColumns = [
     ['key' => 'name', 'label' => 'Employee'],
     ['key' => 'employee_code', 'label' => 'Code'],
@@ -16,8 +18,8 @@
     ['key' => 'present_days', 'label' => 'Present'],
     ['key' => 'late_days', 'label' => 'Late'],
     ['key' => 'half_days', 'label' => 'Half Day'],
-    ['key' => 'total_working_minutes', 'label' => 'Working Minutes'],
-    ['key' => 'total_overtime_minutes', 'label' => 'Overtime Minutes'],
+    ['key' => 'total_working_minutes', 'label' => 'Working Hours', 'type' => 'duration'],
+    ['key' => 'total_overtime_minutes', 'label' => 'Overtime', 'type' => 'duration'],
   ];
   $boardFilters = [
     ['key' => 'month', 'label' => 'Month', 'type' => 'month'],

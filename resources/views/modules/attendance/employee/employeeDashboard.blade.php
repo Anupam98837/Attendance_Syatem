@@ -800,7 +800,7 @@
   async function ensureEmployeeRole() {
     if (localRole) {
       if (localRole !== 'employee') {
-        window.location.replace('/attendance/today');
+        window.location.replace('/dashboard');
         return false;
       }
       return true;
@@ -816,7 +816,7 @@
         localStorage.setItem('role', role);
       }
       if (role && role !== 'employee') {
-        window.location.replace('/attendance/today');
+        window.location.replace('/dashboard');
         return false;
       }
       return role === 'employee';

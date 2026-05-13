@@ -434,6 +434,11 @@
     }
   };
 
+  function rolePath(role){
+    const r = (role || '').toString().trim().toLowerCase();
+    return r === 'employee' ? '/attendance/employee-dashboard' : '/dashboard';
+  }
+
   // Eye toggle
   eyeBtn?.addEventListener('click', () => {
     const show = pwIn.type === 'password';
@@ -449,8 +454,9 @@
       const res  = await fetch(CHECK_API, { headers: { 'Authorization': 'Bearer ' + token } });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.user) {
-        store.set(token, data.user.role || role, true);
-        window.location.replace(safePath('/dashboard'));
+        const resolvedRole = (data.user.role || role || '').toLowerCase();
+        store.set(token, resolvedRole, true);
+        window.location.replace(safePath(rolePath(resolvedRole)));
       } else {
         store.clear();
       }
@@ -496,7 +502,7 @@
 
       store.set(token, role, keep);
       showAlert('success', 'Login successful — redirecting...');
-      setTimeout(() => window.location.assign(safePath('/dashboard')), 480);
+      setTimeout(() => window.location.assign(safePath(rolePath(role))), 480);
     } catch (_) {
       showAlert('error', 'Network error. Please check your connection and try again.');
     } finally {

@@ -546,7 +546,7 @@
 
     function rolePath(role){
       const r = (role || '').toString().trim().toLowerCase();
-      return '/dashboard';
+      return r === 'employee' ? '/attendance/employee-dashboard' : '/dashboard';
     }
 
     function authStoreSet(token, role){

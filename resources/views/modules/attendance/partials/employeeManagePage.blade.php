@@ -640,6 +640,9 @@
   async function promptAddDesignation() {
     const result = await Swal.fire({
       title: 'Add designation',
+      target: document.getElementById('employeeModal'),
+      heightAuto: false,
+      returnFocus: false,
       html: `
         <input id="designationNameInput" class="swal2-input" placeholder="Designation name">
         <input id="designationCodeInput" class="swal2-input" placeholder="Code (optional)">
@@ -648,7 +651,13 @@
       focusConfirm: false,
       showCancelButton: true,
       confirmButtonText: 'Save designation',
-      preConfirm: () => {
+      allowOutsideClick: () => !Swal.isLoading(),
+      allowEscapeKey: () => !Swal.isLoading(),
+      showLoaderOnConfirm: true,
+      didOpen: () => {
+        document.getElementById('designationNameInput')?.focus();
+      },
+      preConfirm: async () => {
         const name = document.getElementById('designationNameInput').value.trim();
         const code = document.getElementById('designationCodeInput').value.trim();
         const description = document.getElementById('designationDescriptionInput').value.trim();
@@ -658,7 +667,18 @@
           return false;
         }
 
-        return { name, code: code || null, description: description || null, status: 'active' };
+        const response = await fetch(api.createDesignation, {
+          method: 'POST',
+          headers: headers(true),
+          body: JSON.stringify({ name, code: code || null, description: description || null, status: 'active' })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          Swal.showValidationMessage(data.message || 'Could not create designation.');
+          return false;
+        }
+
+        return data;
       }
     });
 
@@ -670,17 +690,11 @@
     }
 
     try {
-      const response = await fetch(api.createDesignation, {
-        method: 'POST',
-        headers: headers(true),
-        body: JSON.stringify(result.value)
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Could not create designation.');
-
+      const data = result.value;
       await loadReferenceOptions();
-      if (els.designationSelect && data.data?.id) {
-        els.designationSelect.value = String(data.data.id);
+      if (els.designationSelect) {
+        const identifier = data.data?.id ?? data.data?.uuid ?? '';
+        if (identifier !== '') els.designationSelect.value = String(identifier);
       }
 
       Swal.fire('Saved', data.message || 'Designation created successfully.', 'success');

@@ -8,7 +8,7 @@ Route::redirect('/register', '/');
 Route::redirect('/forgot-password', '/');
 Route::redirect('/reset-password', '/');
 
-Route::view('/dashboard', 'modules.attendance.employee.employeeDashboard');
+Route::view('/dashboard', 'modules.attendance.dashboard.controlTower');
 Route::view('/profile', 'pages.pages.user.profile');
 Route::redirect('/user', '/users/manage');
 
@@ -43,7 +43,7 @@ Route::view('/attendance/offline-sync-logs', 'modules.attendance.operations.mana
 Route::view('/attendance/location-exceptions', 'modules.attendance.operations.manageLocationExceptions');
 Route::view('/attendance/leaves', 'modules.attendance.operations.manageLeaves');
 Route::view('/attendance/employee-mobile', 'modules.attendance.employee.manageEmployeeAppBlueprint');
-Route::redirect('/attendance/employee-dashboard', '/dashboard');
+Route::view('/attendance/employee-dashboard', 'modules.attendance.employee.employeeDashboard');
 Route::view('/attendance/employee-history',   'modules.attendance.employee.employeeAttendanceHistory');
 Route::view('/attendance/employee-leaves',    'modules.attendance.employee.employeeLeaves');
 Route::view('/attendance/employee-activity',  'modules.attendance.employee.employeeActivityLog');

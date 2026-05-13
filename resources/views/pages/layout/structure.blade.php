@@ -762,11 +762,11 @@
   </div>
 
   <div class="w3-sidebar-scroll">
-    <div class="w3-nav-section">
+    <div class="w3-nav-section" id="overviewSectionTitle">
       <div class="w3-section-title"><i class="fa-solid fa-chart-simple"></i> OVERVIEW</div>
       <div class="w3-section-rule"></div>
     </div>
-    <nav class="w3-menu" aria-label="Overview">
+    <nav class="w3-menu" aria-label="Overview" id="overviewMenu">
       <a href="/dashboard" class="w3-link" id="overviewDashboardLink"><i class="fa-solid fa-gauge"></i><span>Dashboard</span></a>
     </nav>
 
@@ -910,7 +910,7 @@
         <div class="w3-section-rule"></div>
       </div>
       <nav class="w3-menu" aria-label="My Attendance">
-        <a href="/dashboard" class="w3-link">
+        <a href="/attendance/employee-dashboard" class="w3-link">
           <i class="fa-solid fa-gauge-high"></i><span>Dashboard</span>
         </a>
         <a href="/attendance/employee-history" class="w3-link">
@@ -991,7 +991,7 @@
   </div>
 
   <div class="w3-sidebar-foot">
-    <a href="/dashboard" class="w3-link">
+    <a href="/dashboard" class="w3-link" id="footerDashboardLink">
       <i class="fa fa-gauge"></i><span>Dashboard</span>
     </a>
     <a href="/profile" class="w3-link">
@@ -1187,6 +1187,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (dynamicMenuWrap)  dynamicMenuWrap.style.display  = 'none';
   }
 
+  function applySidebarRoleChrome(role) {
+    const overviewSectionTitle = document.getElementById('overviewSectionTitle');
+    const overviewMenu = document.getElementById('overviewMenu');
+    const footerDashboardLink = document.getElementById('footerDashboardLink');
+    const isEmployee = role === 'employee';
+
+    if (overviewSectionTitle) overviewSectionTitle.style.display = isEmployee ? 'none' : '';
+    if (overviewMenu) overviewMenu.style.display = isEmployee ? 'none' : '';
+
+    if (footerDashboardLink) {
+      footerDashboardLink.style.display = isEmployee ? 'none' : '';
+      footerDashboardLink.setAttribute('href', isEmployee ? '/attendance/employee-dashboard' : '/dashboard');
+    }
+  }
+
   function showStaticMenu(menuEl) {
     hideAllRoleMenus();
     if (!menuEl) return;
@@ -1199,27 +1214,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const treeVal = data?.tree ?? data;
 
     if (treeVal === 'all') {
+      applySidebarRoleChrome('admin');
       showStaticMenu(adminFullMenu);
-      const ovLink = document.getElementById('overviewDashboardLink');
-      if (ovLink) { ovLink.href = '/attendance/today'; }
-      return true;
-    }
-
-    if (treeVal === 'employee') {
-      showStaticMenu(employeeFullMenu);
-      // Point the overview "Dashboard" link to the unified dashboard route
       const ovLink = document.getElementById('overviewDashboardLink');
       if (ovLink) { ovLink.href = '/dashboard'; }
       return true;
     }
 
-    if (treeVal === 'hr') {
-      showStaticMenu(hrFullMenu);
+    if (treeVal === 'employee') {
+      applySidebarRoleChrome('employee');
+      showStaticMenu(employeeFullMenu);
       const ovLink = document.getElementById('overviewDashboardLink');
-      if (ovLink) { ovLink.href = '/attendance/today'; }
+      if (ovLink) { ovLink.href = '/attendance/employee-dashboard'; }
       return true;
     }
 
+    if (treeVal === 'hr') {
+      applySidebarRoleChrome('hr');
+      showStaticMenu(hrFullMenu);
+      const ovLink = document.getElementById('overviewDashboardLink');
+      if (ovLink) { ovLink.href = '/dashboard'; }
+      return true;
+    }
+
+    applySidebarRoleChrome('dynamic');
     hideAllRoleMenus();
     const tree = Array.isArray(treeVal) ? treeVal : [];
     if (tree.length) {
@@ -2138,6 +2156,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (bootCachedPayload) {
         renderSidebarFromPayload(bootCachedPayload);
         activeNavEl = markActiveLinks();
+        focusActiveNavIntoView(activeNavEl);
       }
 
       const [loaded] = await Promise.all([
@@ -2147,6 +2166,7 @@ document.addEventListener('DOMContentLoaded', () => {
       ]);
       if (loaded && !sessionExpiredShown) {
         activeNavEl = markActiveLinks();
+        focusActiveNavIntoView(activeNavEl);
       }
     } finally {
       if (!sessionExpiredShown) {
