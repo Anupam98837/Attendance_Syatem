@@ -502,6 +502,7 @@ class AttendanceOperationsController extends Controller
 
     public function pendingApprovals(Request $request)
     {
+        $this->reconcilePendingApprovalRows();
         $perPage = max(1, min(200, (int) $request->query('per_page', 20)));
 
         $query = DB::table('attendance_approvals as aa')
@@ -551,6 +552,60 @@ class AttendanceOperationsController extends Controller
                 'last_page' => $paginator->lastPage(),
             ],
         ]);
+    }
+
+    private function reconcilePendingApprovalRows(): void
+    {
+        $latestLogIds = DB::table('attendance_logs')
+            ->whereNull('deleted_at')
+            ->selectRaw('employee_attendance_id, MAX(id) as id')
+            ->groupBy('employee_attendance_id');
+
+        $missingRows = DB::table('employee_attendance as ea')
+            ->leftJoinSub($latestLogIds, 'latest_logs', function ($join) {
+                $join->on('latest_logs.employee_attendance_id', '=', 'ea.id');
+            })
+            ->leftJoin('attendance_approvals as aa', function ($join) {
+                $join->on('aa.employee_attendance_id', '=', 'ea.id')
+                    ->whereNull('aa.deleted_at')
+                    ->where('aa.status', 'pending_approval');
+            })
+            ->whereNull('ea.deleted_at')
+            ->where(function ($query) {
+                $query->where('ea.approval_status', 'pending_approval')
+                    ->orWhere('ea.status', 'pending_approval');
+            })
+            ->whereNull('aa.id')
+            ->orderBy('ea.id')
+            ->get([
+                'ea.id',
+                'ea.user_id',
+                'ea.remarks',
+                'ea.attendance_mode',
+                'ea.work_mode',
+                'ea.attendance_date',
+                'latest_logs.id as attendance_log_id',
+            ]);
+
+        foreach ($missingRows as $row) {
+            $snapshot = array_filter([
+                'attendance_date' => $row->attendance_date,
+                'attendance_mode' => $row->attendance_mode,
+                'work_mode' => $row->work_mode,
+                'source' => 'pending_reconciliation',
+            ], fn ($value) => $value !== null && $value !== '');
+
+            $this->createAttendanceApproval([
+                'user_id' => $row->user_id,
+                'employee_attendance_id' => $row->id,
+                'attendance_log_id' => $row->attendance_log_id ?: null,
+                'requested_by' => $row->user_id,
+                'approval_type' => 'attendance_review',
+                'status' => 'pending_approval',
+                'reason' => $row->remarks ?: 'Attendance requires HR review.',
+                'snapshot' => $snapshot,
+            ]);
+        }
     }
 
     public function decideApproval(Request $request, int $id)
