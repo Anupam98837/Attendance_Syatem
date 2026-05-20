@@ -216,6 +216,12 @@
               <option value="not_marked">Not Marked</option>
             </select>
           </div>
+          <div>
+            <label class="small text-muted d-block mb-1">Branch</label>
+            <select class="form-select" id="fltBranch">
+              <option value="">All branches</option>
+            </select>
+          </div>
           <div class="search-box">
             <label class="small text-muted d-block mb-1">Search</label>
             <input type="search" class="form-control" id="fltQ" placeholder="Employee, code, email, phone">
@@ -287,6 +293,7 @@
     filters: {
       date: new Date().toISOString().slice(0, 10),
       status: '',
+      branch_id: '',
       q: '',
     },
     companyTz: localStorage.getItem('companyTz') || Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -298,6 +305,21 @@
       'Accept': 'application/json',
     },
   });
+
+  async function loadBranchOptions() {
+    const select = document.getElementById('fltBranch');
+    if (!select) return;
+    const res = await api('/api/attendance/admin/branches?per_page=200');
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.message || 'Could not load branches.');
+    const rows = Array.isArray(json.data) ? json.data : [];
+    select.innerHTML = '<option value="">All branches</option>' + rows.map((row) => {
+      const value = row.id ?? row.uuid ?? '';
+      const label = row.code ? `${row.name} (${row.code})` : (row.name || value);
+      return `<option value="${esc(String(value))}">${esc(String(label))}</option>`;
+    }).join('');
+    select.value = state.filters.branch_id || '';
+  }
 
   function esc(v) {
     return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -389,6 +411,7 @@
       date: state.filters.date,
     });
     if (state.filters.status) params.set('status', state.filters.status);
+    if (state.filters.branch_id) params.set('branch_id', state.filters.branch_id);
     if (state.filters.q) params.set('q', state.filters.q);
     return params.toString();
   }
@@ -724,6 +747,12 @@
     state.selected = null;
     refreshAll();
   });
+  document.getElementById('fltBranch').addEventListener('change', (event) => {
+    state.page = 1;
+    state.filters.branch_id = event.target.value;
+    state.selected = null;
+    refreshAll();
+  });
   document.getElementById('fltQ').addEventListener('input', (event) => {
     state.page = 1;
     state.filters.q = event.target.value.trim();
@@ -738,9 +767,10 @@
   document.getElementById('liveResetBtn').addEventListener('click', () => {
     state.page = 1;
     state.selected = null;
-    state.filters = { date: new Date().toISOString().slice(0, 10), status: '', q: '' };
+    state.filters = { date: new Date().toISOString().slice(0, 10), status: '', branch_id: '', q: '' };
     document.getElementById('fltDate').value = state.filters.date;
     document.getElementById('fltStatus').value = '';
+    document.getElementById('fltBranch').value = '';
     document.getElementById('fltQ').value = '';
     refreshAll();
   });
@@ -767,7 +797,11 @@
     renderRows(window.__liveRows || []);
   });
 
-  refreshAll();
+  Promise.resolve(loadBranchOptions()).catch(() => {
+    // Keep live attendance usable even if branches fail to load.
+  }).finally(() => {
+    refreshAll();
+  });
 })();
 </script>
 @endpush

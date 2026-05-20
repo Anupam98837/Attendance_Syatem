@@ -73,6 +73,30 @@
 .emp-designation-row .form-select{
   flex:1;
 }
+.emp-password-wrap{
+  position:relative;
+}
+.emp-password-toggle{
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  border:0;
+  background:transparent;
+  color:var(--muted-color);
+  width:34px;
+  height:34px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+}
+.emp-password-toggle:hover{
+  background:var(--surface-2);
+  color:var(--ink);
+}
+.emp-password-wrap .form-control{
+  padding-right:44px;
+}
 .emp-mini-grid{
   display:grid;
   grid-template-columns:repeat(3, minmax(0,1fr));
@@ -209,7 +233,12 @@
             </div>
             <div>
               <label class="form-label">Password</label>
-              <input type="password" class="form-control employee-field" data-field="password">
+              <div class="emp-password-wrap">
+                <input type="password" class="form-control employee-field" data-field="password" id="employeePasswordInput">
+                <button type="button" class="emp-password-toggle" id="employeePasswordToggle" aria-label="Show password">
+                  <i class="fa-regular fa-eye"></i>
+                </button>
+              </div>
             </div>
             <div>
               <label class="form-label">Login Role</label>
@@ -401,6 +430,8 @@
     managerSelect: document.getElementById('employeeManagerSelect'),
     designationSelect: document.getElementById('employeeDesignationSelect'),
     designationOtherBtn: document.getElementById('employeeDesignationOtherBtn'),
+    passwordInput: document.getElementById('employeePasswordInput'),
+    passwordToggle: document.getElementById('employeePasswordToggle'),
   };
 
   const employeeModal = new bootstrap.Modal(document.getElementById('employeeModal'));
@@ -794,6 +825,15 @@
     }
   });
   els.designationOtherBtn?.addEventListener('click', promptAddDesignation);
+  els.passwordToggle?.addEventListener('click', () => {
+    const input = els.passwordInput;
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    els.passwordToggle.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    const icon = els.passwordToggle.querySelector('i');
+    if (icon) icon.className = `fa-regular ${show ? 'fa-eye-slash' : 'fa-eye'}`;
+  });
   els.perPage.addEventListener('change', () => {
     state.page = 1;
     state.per_page = Number(els.perPage.value || 20);

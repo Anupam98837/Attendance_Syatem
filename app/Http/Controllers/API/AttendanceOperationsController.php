@@ -1032,6 +1032,8 @@ class AttendanceOperationsController extends Controller
             $query->whereDate('q.queued_at', '<=', $request->query('to'));
         }
 
+        $this->applyEmployeeFilters($query, $request);
+
         $paginator = $query->orderByDesc('q.id')->paginate($perPage);
 
         return response()->json([

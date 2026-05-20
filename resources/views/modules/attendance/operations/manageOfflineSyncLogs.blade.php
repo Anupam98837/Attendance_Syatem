@@ -23,6 +23,7 @@
     ['key' => 'device_id', 'label' => 'Device ID', 'type' => 'text'],
     ['key' => 'from', 'label' => 'From', 'type' => 'date'],
     ['key' => 'to', 'label' => 'To', 'type' => 'date'],
+    ['key' => 'branch_id', 'label' => 'Branch', 'type' => 'relation-select', 'source' => 'branches', 'placeholder' => 'All branches'],
   ];
 @endphp
 @include('modules.attendance.partials.dataBoard')

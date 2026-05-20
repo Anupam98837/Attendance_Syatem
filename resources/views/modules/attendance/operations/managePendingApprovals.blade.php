@@ -24,6 +24,7 @@
   $boardFilters = [
     ['key' => 'status', 'label' => 'Status', 'type' => 'select', 'options' => ['pending_approval' => 'Pending Approval', 'approved' => 'Approved', 'rejected' => 'Rejected']],
     ['key' => 'approval_type', 'label' => 'Approval Type', 'type' => 'text'],
+    ['key' => 'branch_id', 'label' => 'Branch', 'type' => 'relation-select', 'source' => 'branches', 'placeholder' => 'All branches'],
   ];
   $boardDefaultQuery = ['status' => 'pending_approval'];
   $boardActions = [
